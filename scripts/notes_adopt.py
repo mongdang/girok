@@ -352,6 +352,11 @@ def git_setup(root: Path) -> GitSetup:
     Everything here resolves rather than refuses, except a workspace: a
     `git init` one level too high swallows the repositories underneath, and
     that is not a thing to fix afterwards.
+
+    This computes and returns; it does not print. `main()` is the only
+    place in this module that owns stdout, so a caller reads
+    `result.already_tracked` and reports it — telling the person that
+    `.gitignore` cannot undo a commit that already happened.
     """
     root = Path(root).resolve()
     if notes_config.is_workspace(root):
@@ -386,18 +391,6 @@ def git_setup(root: Path) -> GitSetup:
         text = existing if existing.endswith("\n") or not existing else existing + "\n"
         gitignore.write_text(text + block, encoding="utf-8", newline="\n")
         setup.gitignore_added = missing
-
-    if setup.already_tracked:
-        # Match main()'s stream setup — Windows defaults stdout to the system
-        # codepage, which cannot encode this Korean text and would crash.
-        if hasattr(sys.stdout, "reconfigure"):
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        print(
-            "[주의] 다음 파일은 이미 git 에 커밋되어 있어 .gitignore 를 추가해도 "
-            "빠지지 않는다 — 이력을 지우려면 이력을 다시 써야 하는데 이 방법론은 "
-            "그것을 금지한다. 비밀이 들어 있다면 값을 폐기·교체하는 것이 답이다: "
-            + ", ".join(setup.already_tracked)
-        )
 
     setup.remote = _remote_of(root)
     return setup
