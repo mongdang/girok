@@ -211,7 +211,10 @@ def init(
             result, root,
         )
 
-    if worker:
+    # Only a parallel repository has per-worker folders. Keying this off
+    # `worker` alone gave a non-parallel repository that happened to have a
+    # `workers` entry a `docs_<id>/` it had to delete by hand.
+    if worker and parallel_mode:
         _init_worker(notes, worker, fields, result, root)
 
     method_sync.sync(root, plugin_root)

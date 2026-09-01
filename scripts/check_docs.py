@@ -70,6 +70,15 @@ TOC_MIN_BYTES = 1500
 # can verify it, so it is excluded rather than reported as dead.
 FOREIGN_ADR = re.compile(r"`[\w.-]+`\S*\s*(?:ADR-[\w-]+|decisions/\d{3}(?!\d))")
 
+# The same citation written with a space before the particle. Korean particles
+# attach to the word before them, so this is a spacing mistake rather than a
+# dead reference — and saying "존재하지 않는 … 인용" for it sent one reader
+# hunting for a bug in this checker and another deleting the particle to get
+# past it. Matched separately so the message can name the real cause.
+FOREIGN_ADR_SPACED = re.compile(
+    r"`[\w.-]+`\s+\S*\s*(?:ADR-[\w-]+|decisions/\d{3}(?!\d))"
+)
+
 
 @dataclass
 class Problem:
@@ -435,8 +444,18 @@ def check_adr_citations(
         if raw_text is None:
             raw_text = path.read_text(encoding="utf-8")
         text = FOREIGN_ADR.sub("", raw_text)
+        # Citations that survive only because the particle was written apart
+        # from the repository name. Those get a message about the spacing.
+        forgiving = _citations(FOREIGN_ADR_SPACED.sub("", text), style)
         for ref in sorted(_citations(text, style) - existing):
-            result.failures.append(Problem(_rel(path, cfg), f"존재하지 않는 {label}{ref} 인용"))
+            if ref not in forgiving:
+                message = (
+                    f"{label}{ref} 인용의 조사가 저장소명에서 떨어져 있다 — "
+                    f"`저장소명`의 처럼 붙여 쓸 것"
+                )
+            else:
+                message = f"존재하지 않는 {label}{ref} 인용"
+            result.failures.append(Problem(_rel(path, cfg), message))
 
     for d in dirs:
         readme = d / "README.md"

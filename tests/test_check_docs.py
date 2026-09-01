@@ -486,3 +486,36 @@ def test_an_equipment_registry_path_is_not_a_file_path(notes_repo):
     result = run(notes_repo)
 
     assert not any("절대경로" in w.message for w in result.warnings)
+
+
+def test_says_so_when_a_foreign_citation_detaches_its_particle(notes_repo):
+    """`other-repo` 의 ADR-020 — with a space before the particle — is the same
+    citation written with a Korean spacing mistake: a particle attaches to the
+    word before it. The linter has to name that, because reporting it as a dead
+    reference sent one reader looking for a bug in the linter and another
+    deleting the particle to get past it.
+    """
+    write(
+        notes_repo / "notes" / "docs" / "PROGRESS.md",
+        """
+# 현황판
+
+---
+
+## 목차
+
+- [상태 요약](#상태-요약)
+
+---
+
+## 상태 요약
+
+형식은 `other-repo` 의 ADR-020 을 이식한 것
+""",
+    )
+
+    result = run(notes_repo)
+
+    assert not result.ok
+    assert any("조사" in f.message for f in result.failures)
+    assert not any("존재하지 않는" in f.message for f in result.failures)

@@ -353,3 +353,18 @@ def test_no_worker_named_leaves_the_mapping_empty(empty_repo):
 
     config = json.loads((empty_repo / ".claude" / "girok.json").read_text(encoding="utf-8"))
     assert config["workers"] == {}
+
+
+def test_no_worker_folder_when_parallel_work_is_off(empty_repo):
+    """A repository with `parallelMode: false` has no per-worker folders, so
+    creating one leaves a stray board nobody merges. Initialization used to
+    key this off `--worker` alone, and a non-parallel repository that had a
+    `workers` entry got a `docs_<id>/` it then had to delete by hand.
+    """
+    notes_init.init(
+        empty_repo, notes_dir="notes", repo_name="fresh",
+        worker="abc", parallel_mode=False,
+    )
+
+    assert not (empty_repo / "notes" / "docs_abc").exists()
+    assert (empty_repo / "notes" / "docs" / "PROGRESS.md").is_file()
