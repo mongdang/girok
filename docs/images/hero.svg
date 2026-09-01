@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="340" viewBox="0 0 1000 340" role="img" aria-label="girok — 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F1319"/>
+      <stop offset="1" stop-color="#141B19"/>
+    </linearGradient>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0 H0 V28" fill="none" stroke="#1C232B" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1000" height="340" rx="12" fill="url(#bg)"/>
+  <rect width="1000" height="340" rx="12" fill="url(#grid)" opacity="0.55"/>
+  <rect x="0.5" y="0.5" width="999" height="339" rx="12" fill="none" stroke="#272E38"/>
+
+  <text x="70" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace" font-size="66" font-weight="700" fill="#EAF0F6" letter-spacing="-1">girok</text>
+  <text x="268" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace" font-size="15" fill="#4E9B6C">기록</text>
+  <rect x="70" y="142" width="86" height="3" rx="1.5" fill="#4E9B6C"/>
+
+  <text x="70" y="186" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="19" fill="#D6DEE8">문서 규칙은 한 곳에만 두고,</text>
+  <text x="70" y="214" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="19" fill="#D6DEE8">모든 저장소가 <tspan font-weight="700" fill="#FFFFFF">같은</tspan> 규칙을 따르게 한다</text>
+  <text x="70" y="246" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="12.5" fill="#7D8590">A documentation methodology as a Claude Code plugin — the rules ship frozen into every repo that adopts them.</text>
+
+  <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="12">
+    <rect x="70" y="270" width="132" height="28" rx="6" fill="#182119" stroke="#4E9B6C"/>
+    <text x="136" y="289" text-anchor="middle" fill="#4E9B6C">현황판 · ADR</text>
+    <rect x="214" y="270" width="112" height="28" rx="6" fill="#211D16" stroke="#E0A458"/>
+    <text x="270" y="289" text-anchor="middle" fill="#E0A458">문서 검사기</text>
+    <rect x="338" y="270" width="112" height="28" rx="6" fill="#211714" stroke="#D4644A"/>
+    <text x="394" y="289" text-anchor="middle" fill="#D4644A">안전 게이트</text>
+    <rect x="462" y="270" width="164" height="28" rx="6" fill="#161C22" stroke="#6E9FD4"/>
+    <text x="544" y="289" text-anchor="middle" fill="#6E9FD4">.method/ 동결 사본</text>
+  </g>
+
+  <g opacity="0.9">
+    <rect x="736" y="56" width="196" height="58" rx="8" fill="#182119" stroke="#4E9B6C"/>
+    <text x="834" y="80" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="12.5" fill="#4E9B6C">플러그인</text>
+    <text x="834" y="99" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="11" fill="#7D8590">규칙 원본 하나</text>
+
+    <path d="M834 114 V146" stroke="#7D8590" stroke-width="1.5"/>
+    <path d="M829 140 l5 8 l5 -8" fill="none" stroke="#7D8590" stroke-width="1.5"/>
+    <text x="846" y="136" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace" font-size="10.5" fill="#7D8590">sync</text>
+
+    <rect x="736" y="148" width="196" height="58" rx="8" fill="#211D16" stroke="#E0A458"/>
+    <text x="834" y="172" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="12.5" fill="#E0A458">.method/</text>
+    <text x="834" y="191" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="11" fill="#7D8590">저장소에 커밋된다</text>
+
+    <path d="M834 206 V238" stroke="#7D8590" stroke-width="1.5"/>
+    <path d="M829 232 l5 8 l5 -8" fill="none" stroke="#7D8590" stroke-width="1.5"/>
+    <text x="846" y="228" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace" font-size="10.5" fill="#7D8590">CI 검증</text>
+
+    <rect x="736" y="240" width="196" height="58" rx="8" fill="#171B20" stroke="#4B5563"/>
+    <text x="834" y="264" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="12.5" fill="#9AA4B2">저장소</text>
+    <text x="834" y="283" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans KR,Helvetica,Arial,sans-serif" font-size="11" fill="#7D8590">clone 만 해도 읽힌다</text>
+  </g>
+</svg>

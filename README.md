@@ -1,9 +1,20 @@
-<h1 align="center">girok</h1>
+<p align="center">
+  <img src="docs/images/hero.svg" alt="girok — 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다" width="880">
+</p>
 
 <p align="center">
-  <strong>문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다.</strong><br>
-  기록은 현황판 · 결정 기록(ADR) · 아카이브로 나눠 담고, 사람이 실제로 저지르는 실수는 검사기가 잡는다.<br>
-  실장비를 다루는 프로젝트에는 에이전트가 닫을 수 없는 안전 게이트를 둔다.
+  기록은 <strong>현황판 · 결정 기록(ADR) · 아카이브</strong>로 나눠 담고, 사람이 실제로 저지르는 실수는 검사기가 잡는다.<br>
+  실장비를 다루는 프로젝트에는 <strong>에이전트가 닫을 수 없는</strong> 안전 게이트를 둔다.
+</p>
+
+<p align="center">
+  <sub><em>A documentation methodology as a Claude Code plugin. Korean-first; the rules ship as
+  <code>.method/RULES.md</code> in every repository that adopts it.</em></sub>
+</p>
+
+<p align="center">
+  <a href="README.md">한국어</a> ·
+  <a href="docs/README.en.md">English</a>
 </p>
 
 <p align="center">
@@ -15,8 +26,11 @@
 </p>
 
 <p align="center">
-  <sub><em>A documentation methodology as a Claude Code plugin. Korean-first; the rules ship as
-  <code>.method/RULES.md</code> in every repository that adopts it.</em></sub>
+  <img src="docs/images/survey.svg" alt="/notes 실행 화면 — 저장소를 읽고 설정을 제안한다" width="700">
+</p>
+
+<p align="center">
+  <sub>도입은 <code>/notes</code> 한 번. <b>뼈대를 만들기 전에 저장소부터 읽고</b>, 이미 쓰고 있는 관례에서 설정을 추론해 제안한다</sub>
 </p>
 
 ---
@@ -106,15 +120,11 @@ flowchart TD
 ### 1단계 · 플러그인 설치 (머신당 1회)
 
 ```bash
-git clone <저장소 주소>
-cd <저장소 폴더>
-claude                                            # "이 폴더를 신뢰?" → 예
+claude plugin marketplace add mongdang/girok
+claude plugin install girok@mongdang
 ```
 
-```bash
-claude plugin install girok@mongdang   # 저장소 폴더 안에서 실행
-```
-
+Claude Code 안에서라면 `/plugin marketplace add mongdang/girok` → `/plugin install girok@mongdang`.
 설치 후 **Claude Code 를 껐다 켠다** — 훅은 세션이 시작할 때 붙는다.
 
 > [!NOTE]
@@ -151,6 +161,10 @@ claude plugin install girok@mongdang   # 저장소 폴더 안에서 실행
 
 그다음 무엇을 만들지 확인을 받는다. 답하면 나머지는 알아서 만들어진다.
 
+<p align="center">
+  <img src="docs/images/init.svg" alt="초기화 결과 — 없던 것만 만들고 있던 파일은 유지한다" width="720">
+</p>
+
 만들어진 결과는 **커밋한다.** 특히 `.claude/settings.json` 이 커밋돼야 팀원이 플러그인
 선언을 받는다.
 
@@ -164,12 +178,9 @@ claude
 이것으로 끝이다. 따로 칠 명령은 없다. 세션이 시작되는 시점에 규칙 판본·작업자·현황판
 상태·열린 게이트 항목을 이미 파악한 상태다.
 
-```
-[girok] ready vX.Y.Z
-작업자 abc (git user.email 로 확정)
-현황판 notes/docs_abc/PROGRESS.md — 활성 위험 0건, 열린 질문 0건
-안전 게이트 OPEN 1건
-```
+<p align="center">
+  <img src="docs/images/session.svg" alt="세션 시작 화면 — 판본·작업자·현황판·게이트 상태가 이미 주입돼 있다" width="720">
+</p>
 
 > 매일 쓰는 법·막혔을 때·문제 해결은 **[사용법 문서](docs/%EC%82%AC%EC%9A%A9%EB%B2%95.md)** 에 따로 있다.
 
@@ -239,6 +250,10 @@ python <진행기록폴더>/.method/scripts/marker_scan.py
 python <진행기록폴더>/.method/scripts/method_sync.py verify
 ```
 
+<p align="center">
+  <img src="docs/images/lint.svg" alt="검사기 출력 — 표 끊김·죽은 앵커·없는 ADR 인용·로컬 절대경로를 잡는다" width="760">
+</p>
+
 바로 쓸 수 있는 워크플로가 [`ci/github-actions.yml`](ci/github-actions.yml) 에 있다.
 훅은 빠른 피드백, **CI가 보증**이다 — 플러그인이 없는 사람, 다른 에이전트, 웹 UI 편집은
 훅을 그냥 통과하기 때문이다.
@@ -269,6 +284,10 @@ python <진행기록폴더>/.method/scripts/method_sync.py verify
 ### 규칙을 어겨야 할 때
 
 force push 는 막혀 있다. 정말 해야 하면 **이유를 담아** 실행한다:
+
+<p align="center">
+  <img src="docs/images/block.svg" alt="force push 차단 — 스위치가 아니라 이유를 요구한다" width="760">
+</p>
 
 ```bash
 GIROK_FORCE_PUSH_REASON="이력 리셋 — 사용자 지시 2026-09-01" git push origin +master
