@@ -50,11 +50,6 @@ TOKENS = [
     (re.compile(r"^\[생성\]"), GREEN),
     (re.compile(r"^\[유지\]"), DIM),
     (re.compile(r"^\[girok\]"), GREEN),
-    (re.compile(r"^\[fail\]"), RED),
-    (re.compile(r"^\[blocked\]"), RED),
-    (re.compile(r"^\[warn\]"), AMBER),
-    (re.compile(r"^\[created\]"), GREEN),
-    (re.compile(r"^\[kept\]\s*"), DIM),
 ]
 
 
@@ -251,26 +246,6 @@ HERO_KO = {
     "edges": ["sync", "CI 검증"],
 }
 
-HERO_EN = {
-    "label": "girok — keep the documentation rules in one place and make every repository follow the same ones",
-    "line1": "Keep the documentation rules in one place,",
-    "line2": ("and make every repo follow the ", "same", " ones"),
-    "sub": "A Claude Code plugin — status board, ADRs, a docs linter, and a safety gate an agent cannot close.",
-    "chips": [
-        ("Status board · ADR", GREEN, "#182119"),
-        ("Docs linter", AMBER, "#211D16"),
-        ("Safety gate", RED, "#211714"),
-        (".method/ frozen copy", BLUE, "#161C22"),
-    ],
-    "flow": [
-        ("Plugin", "one original", GREEN, "#182119"),
-        (".method/", "committed to the repo", AMBER, "#211D16"),
-        ("Repository", "readable from a clone", "#9AA4B2", "#171B20"),
-    ],
-    "edges": ["sync", "CI verifies"],
-}
-
-
 def sans_width(s: str, fs: float) -> float:
     """비례 글꼴 폭 추정 — CJK 는 전각, 라틴은 대략 0.55em."""
     return sum(fs if ord(c) > 0x2000 else fs * 0.55 for c in s)
@@ -343,114 +318,11 @@ def hero(t: dict) -> str:
 '''
 
 
-# 영문 판본 — 콘솔 출력은 한국어로 나오므로 이쪽은 번역이다.
-# 영어 README 가 한국어 캡처만 싣고 있으면 그 페이지를 둔 이유가 없어진다.
-CARDS_EN: dict[str, tuple[str, list]] = {}
-
-CARDS_EN["survey"] = (
-    "/notes — it reads the repository before it builds anything",
-    [
-        "$ /notes",
-        "",
-        "Repository: trading-bot · 43 documents",
-        "",
-        "Proposed configuration:",
-        ("  notes location", "."),
-        ("  status board", "STATE.md"),
-        ("  decision records", "decisions (numbered)"),
-        ("  linted folders", "decisions, docs, experiments"),
-        ("  safety gate", "off"),
-        ("  archive", "off"),
-        ("  parallel work", "off"),
-        "",
-        "1 thing to look at:",
-        '  - `CLAUDE.md` states "do not create an archive folder" — following',
-        "    that convention, the archive module is turned off",
-        "",
-        "This is a proposal — nothing was written. Confirm before initializing.",
-    ],
-)
-
-CARDS_EN["init"] = (
-    "It only builds after you confirm — existing files are left alone",
-    [
-        "$ /notes  →  confirmed",
-        "",
-        "[created] .claude/girok.json",
-        "[created] .claude/settings.json",
-        "[created] notes/CLAUDE.md",
-        "[created] notes/GEMINI.md",
-        "[created] notes/AGENTS.md",
-        "[created] notes/docs/PROGRESS.md",
-        "[created] notes/docs/decisions/README.md",
-        "[created] notes/docs/SAFETY_GATE.md",
-        ("[kept]    README.md", "← already there. not overwritten"),
-        ("[created] notes/.method/", "← frozen copy of the ruleset"),
-        "",
-        "10 created, 1 kept",
-    ],
-)
-
-CARDS_EN["session"] = (
-    "By the time the session starts, it already knows where things stand",
-    [
-        "$ cd my-robot && claude",
-        "",
-        "[girok] ready v0.18.0",
-        "worker abc (resolved from git user.email)",
-        "board notes/docs_abc/PROGRESS.md — 0 active risks, 0 open questions",
-        "safety gate 1 OPEN",
-        "",
-        "Safety: while a gate item is OPEN, do not run or suggest hardware",
-        "motion commands (homing, jogging, automated tests). Only a human",
-        "fills in an item's verifier field — never the agent.",
-    ],
-)
-
-CARDS_EN["lint"] = (
-    "The linter runs the moment a document is written",
-    [
-        "$ python notes/.method/scripts/check_docs.py",
-        "",
-        "[fail] notes/docs/SETUP.md -> table broken by a blank line — rows from",
-        "       line 14 render as text outside the table",
-        "[fail] notes/docs/SETUP.md -> TOC anchor `#calibration` has no heading",
-        "[fail] notes/docs/SETUP.md -> cites ADR-042, which does not exist",
-        "[warn] notes/CLAUDE.md -> no `## Contents` (2,479 bytes)",
-        "[warn] notes/docs/SETUP.md -> local absolute path (C:\\Users\\abc\\build)",
-        "       — differs per machine. use the repo name and a relative path",
-        "",
-        "7 documents checked, 3 failed",
-    ],
-)
-
-CARDS_EN["block"] = (
-    "It asks for a reason, not a switch",
-    [
-        "$ git push origin +master",
-        "",
-        "[blocked] force push — history is itself a decision record and is hard",
-        "          to undo. To tidy history, use a tree-identical commit (`-s",
-        "          ours` linking the ancestor). If you still must, run it with",
-        "          GIROK_FORCE_PUSH_REASON — a reason, not a switch (8+ chars).",
-        "          That reason stays on the session record",
-        "",
-        '$ GIROK_FORCE_PUSH_REASON="history reset — instructed 2026-09-01" \\',
-        "    git push origin +master",
-        "",
-        "[girok] rule broken: force push · reason is on the record",
-    ],
-)
-
-
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "en").mkdir(exist_ok=True)
-    written = [("hero.svg", hero(HERO_KO)), ("en/hero.svg", hero(HERO_EN))]
+    written = [("hero.svg", hero(HERO_KO))]
     for name, (title, lines) in CARDS.items():
         written.append((f"{name}.svg", terminal(title, lines)))
-    for name, (title, lines) in CARDS_EN.items():
-        written.append((f"en/{name}.svg", terminal(title, lines)))
     for name, svg in written:
         (OUT / name).write_text(svg, encoding="utf-8", newline="\n")
         print(f"[생성] docs/images/{name}")

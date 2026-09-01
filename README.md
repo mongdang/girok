@@ -8,16 +8,6 @@
 </p>
 
 <p align="center">
-  <sub><em>A documentation methodology as a Claude Code plugin. Korean-first; the rules ship as
-  <code>.method/RULES.md</code> in every repository that adopts it.</em></sub>
-</p>
-
-<p align="center">
-  <a href="README.md">한국어</a> ·
-  <a href="docs/README.en.md">English</a>
-</p>
-
-<p align="center">
   <a href="https://github.com/mongdang/girok/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/mongdang/girok/actions/workflows/tests.yml/badge.svg"></a>
   <a href="https://github.com/mongdang/girok/blob/master/.claude-plugin/plugin.json"><img alt="version" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmongdang%2Fgirok%2Fmaster%2F.claude-plugin%2Fplugin.json&query=%24.version&prefix=v&label=version&color=3F7D58&style=flat-square"></a>
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/github/license/mongdang/girok?color=6B7280&style=flat-square"></a>
