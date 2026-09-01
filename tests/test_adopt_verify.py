@@ -18,7 +18,13 @@ def adopted(tmp_path):
         "notesDir": ".", "board": "STATE.md", "decisionsDir": "decisions",
         "adrStyle": "adr-prefixed",
     }))
-    write(root / "STATE.md", "# 현황\n\n돌아간다\n")
+    # The board links the decision it records — the ordinary shape of a
+    # repository worth adopting, and the one that makes `apply` rewrite a
+    # link inside a document it also moves.
+    write(
+        root / "STATE.md",
+        "# 현황\n\n돌아간다\n\n- [첫 결정](decisions/001-first.md)\n",
+    )
     write(root / "decisions" / "001-first.md", "# 001\n")
     notes_adopt.run_git(root, "init")
     notes_adopt.run_git(root, "config", "user.email", "t@example.invalid")
@@ -40,12 +46,46 @@ def test_a_clean_adoption_verifies(adopted):
     assert result.ok, result.failures
 
 
-def test_content_is_identical_after_adoption(adopted):
-    before = notes_adopt.sha1_of(adopted / "STATE.md")
+def test_only_link_destinations_change_in_a_moved_document(adopted):
+    # A moved document is not byte-identical to its original when `apply`
+    # repointed a link inside it — that rewrite is the whole point. What is
+    # guaranteed is narrower and still checkable: everything except the
+    # link destinations is the same text.
+    before = (adopted / "STATE.md").read_text(encoding="utf-8")
 
     notes_adopt.apply(adopted, today="20260901")
 
-    assert notes_adopt.sha1_of(adopted / "PROGRESS.md") == before
+    after = (adopted / "PROGRESS.md").read_text(encoding="utf-8")
+    assert after != before, "링크가 재작성됐어야 한다"
+    assert notes_adopt.link_skeleton(after) == notes_adopt.link_skeleton(before)
+
+
+def test_content_is_identical_when_no_link_was_rewritten(adopted):
+    before = notes_adopt.sha1_of(adopted / "decisions" / "001-first.md")
+
+    notes_adopt.apply(adopted, today="20260901")
+
+    moved = adopted / "docs" / "decisions" / "ADR-001-first.md"
+    assert notes_adopt.sha1_of(moved) == before
+
+
+def test_verify_catches_a_change_that_hides_behind_the_recorded_hash(adopted):
+    # The nightmare this check exists for: something mangles a moved
+    # document and the mapping's post-move hash agrees with the mangled
+    # bytes. Only the untouched backup can still tell the truth.
+    notes_adopt.apply(adopted, today="20260901")
+    board = adopted / "PROGRESS.md"
+    board.write_text("# 현황\n\n딴 소리\n", encoding="utf-8")
+    mapping = notes_adopt.read_mapping(adopted)
+    for item in mapping["files"]:
+        if item.get("to") == "PROGRESS.md":
+            item["sha1After"] = notes_adopt.sha1_of(board)
+    notes_adopt._write_mapping_payload(adopted, mapping)
+
+    result = notes_adopt.verify(adopted)
+
+    assert not result.ok
+    assert any("PROGRESS.md" in f for f in result.failures)
 
 
 def test_a_tampered_file_fails_verification(adopted):
@@ -200,7 +240,7 @@ def test_a_mid_move_failure_names_the_real_tag_and_backup(adopted, monkeypatch, 
     out = capsys.readouterr().out
     assert "girok-adopt-before-20" in out  # real tag, not a placeholder
     assert f"{adopted.name}-girok-backup-20" in out  # real backup folder name
-    assert "git checkout girok-adopt-before-20" in out
+    assert "git reset --hard girok-adopt-before-20" in out
 
 
 def test_a_pre_backup_failure_gives_no_restore_guidance(tmp_path, capsys):
@@ -221,3 +261,72 @@ def test_a_pre_backup_failure_gives_no_restore_guidance(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "복원" not in out
     assert "checkout" not in out
+
+
+def test_a_merge_target_is_what_verify_checks(adopted):
+    # A mapping may carry both fields — a person resolving `?` fills in
+    # `to` and then decides the document should be merged instead. The
+    # merge is what actually happened, so it is what must be checked; the
+    # stale `to` names a path that was never created.
+    mapping = notes_adopt.read_mapping(adopted)
+    for item in mapping["files"]:
+        if item["from"] == "decisions/001-first.md":
+            item["to"] = "docs/decisions/ADR-001-first.md"
+            item["merge"] = "PROGRESS.md"
+    notes_adopt._write_mapping_payload(adopted, mapping)
+
+    notes_adopt.apply(adopted, today="20260901")
+    result = notes_adopt.verify(adopted)
+
+    assert result.ok, result.failures
+
+
+def test_the_mapping_records_the_restore_tag(adopted):
+    notes_adopt.apply(adopted, today="20260101")
+
+    assert notes_adopt.read_mapping(adopted)["tag"] == "girok-adopt-before-20260101"
+
+
+def test_verify_names_the_tag_that_exists_not_todays(adopted, capsys):
+    # Adopting yesterday and verifying today used to print a tag nobody
+    # ever created — precisely when a person needs the command to work.
+    notes_adopt.apply(adopted, today="20260101")
+    (adopted / "PROGRESS.md").unlink()
+
+    code = notes_adopt.main(["verify", "--root", str(adopted)])
+
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "girok-adopt-before-20260101" in out
+    assert f"{adopted.name}-girok-backup-20260101" in out
+
+
+def test_verify_leads_with_the_backup_not_a_partial_checkout(adopted, capsys):
+    # `git checkout <tag> -- .` restores the old paths and leaves the new
+    # ones in place, so the repository ends up holding both copies.
+    notes_adopt.apply(adopted, today="20260101")
+    (adopted / "PROGRESS.md").unlink()
+
+    notes_adopt.main(["verify", "--root", str(adopted)])
+
+    out = capsys.readouterr().out
+    assert out.index("-girok-backup-") < out.index("girok-adopt-before-")
+    assert "git checkout girok-adopt-before" not in out
+
+
+def test_an_undecodable_document_is_named_not_a_traceback(adopted, capsys):
+    # One .md saved in cp949 used to end the run in a UnicodeDecodeError
+    # that did not even say which file — with a backup and a tag already
+    # made and no word about either.
+    (adopted / "docs").mkdir(exist_ok=True)
+    (adopted / "docs" / "옛문서.md").write_bytes("# 옛 문서\n".encode("cp949"))
+    notes_adopt.run_git(adopted, "add", "-A")
+    notes_adopt.run_git(adopted, "commit", "-m", "cp949")
+    notes_adopt.write_mapping(adopted, notes_adopt.plan(adopted), None)
+
+    code = notes_adopt.main(["apply", "--root", str(adopted), "--confirm", adopted.name])
+
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "옛문서.md" in out
+    assert "-girok-backup-20" in out, "이미 만들어진 백업을 알려야 한다"

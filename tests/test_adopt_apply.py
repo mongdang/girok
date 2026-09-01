@@ -155,3 +155,121 @@ def test_content_survives_the_move(repo):
 ])
 def test_names_are_normalized(name, role, style, expected):
     assert notes_adopt.normalize_name(name, role, style) == expected
+
+
+def test_an_uncommitted_document_that_is_not_moving_does_not_block(repo):
+    # Editing `CLAUDE.md` is ordinary work. It never moves, so the restore
+    # tag not holding this edit costs adoption nothing.
+    (repo / "CLAUDE.md").write_text("# 규칙\n", encoding="utf-8")
+    mapping = _mapping([
+        {"from": "CLAUDE.md", "to": None, "role": "rules", "merge": None,
+         "sha1": "x", "bytes": 1, "why": ""},
+        {"from": "STATE.md", "to": "PROGRESS.md", "role": "board", "merge": None,
+         "sha1": "x", "bytes": 1, "why": ""},
+    ])
+
+    notes_adopt.check_preconditions(repo, mapping)
+
+
+def _adoptable(tmp_path, name="proj", config=None):
+    import json
+
+    root = tmp_path / name
+    write(root / ".claude" / "girok.json", json.dumps(config if config else {
+        "notesDir": ".", "board": "STATE.md", "decisionsDir": "decisions",
+        "adrStyle": "adr-prefixed",
+    }))
+    write(root / "STATE.md", "# 현황\n")
+    write(root / "decisions" / "001-first.md", "# 001\n")
+    notes_adopt.run_git(root, "init")
+    notes_adopt.run_git(root, "config", "user.email", "t@example.invalid")
+    notes_adopt.run_git(root, "config", "user.name", "t")
+    notes_adopt.run_git(root, "add", "-A")
+    notes_adopt.run_git(root, "commit", "-m", "init")
+    notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
+    return root
+
+
+def test_apply_makes_the_config_describe_where_the_files_went(tmp_path):
+    # Files at `PROGRESS.md` and `docs/decisions/` with a config still
+    # naming `STATE.md` and `decisions/` means girok breaks in this
+    # repository the moment adoption reports success.
+    import json
+
+    root = _adoptable(tmp_path)
+
+    notes_adopt.apply(root, today="20260901")
+
+    config = json.loads((root / ".claude" / "girok.json").read_text(encoding="utf-8"))
+    assert config["board"] == "PROGRESS.md"
+    assert config["decisionsDir"] == "docs/decisions"
+
+
+def test_the_updated_config_is_committed_with_the_adoption(tmp_path):
+    root = _adoptable(tmp_path)
+
+    notes_adopt.apply(root, today="20260901")
+
+    status = notes_adopt.run_git(root, "status", "--porcelain").stdout
+    assert "girok.json" not in status, "설정 갱신이 커밋에 들어가야 한다"
+
+
+def test_the_config_update_is_recorded_in_the_mapping(tmp_path):
+    root = _adoptable(tmp_path)
+
+    notes_adopt.apply(root, today="20260901")
+
+    updated = notes_adopt.read_mapping(root)["configUpdated"]
+    assert updated["board"] == "PROGRESS.md"
+
+
+def test_a_custom_doc_root_keeps_being_linted(tmp_path):
+    # Documents land in `docs/`, so `docs` has to be a doc root — but the
+    # roots the repository already declared are not ours to drop.
+    import json
+
+    root = _adoptable(tmp_path, config={
+        "notesDir": ".", "board": "STATE.md", "decisionsDir": "decisions",
+        "docRoots": ["documents"], "adrStyle": "adr-prefixed",
+    })
+    write(root / "documents" / "설계.md", "# 설계\n")
+    notes_adopt.run_git(root, "add", "-A")
+    notes_adopt.run_git(root, "commit", "-m", "doc")
+    notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
+
+    notes_adopt.apply(root, today="20260901")
+
+    config = json.loads((root / ".claude" / "girok.json").read_text(encoding="utf-8"))
+    assert config["docRoots"] == ["docs", "documents"]
+
+
+def test_the_console_reports_files_left_out_of_git(tmp_path, capsys):
+    # A secret or a huge file is `.gitignore`d, which in a freshly
+    # `git init`ed repository means it exists in the backup folder and
+    # nowhere else. Nobody reads the mapping JSON to find that out.
+    root = tmp_path / "proj"
+    write(root / "STATE.md", "# 현황\n")
+    write(root / ".env", "TOKEN=x\n")
+    notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
+
+    code = notes_adopt.main(["apply", "--root", str(root), "--confirm", root.name])
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert ".env" in out
+
+
+def test_a_dry_run_plan_leaves_the_mapping_alone(tmp_path, capsys):
+    # `/notes` runs `plan` as a routine check. Rewriting the mapping there
+    # throws away the `?` resolutions a person filled in by hand.
+    root = _adoptable(tmp_path)
+    mapping = notes_adopt.read_mapping(root)
+    mapping["files"][0]["why"] = "사람이 남긴 메모"
+    notes_adopt._write_mapping_payload(root, mapping)
+    before = (root / ".claude" / "girok-adopt.json").read_text(encoding="utf-8")
+
+    code = notes_adopt.main(["plan", "--root", str(root), "--dry-run"])
+
+    assert code == 0
+    assert (root / ".claude" / "girok-adopt.json").read_text(encoding="utf-8") == before
+    assert "STATE.md" in capsys.readouterr().out

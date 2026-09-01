@@ -165,9 +165,14 @@ class Entry:
     merge: str | None = None
 
     def as_json(self) -> dict:
+        # `sha1After` is the hash `apply` leaves behind once link rewriting
+        # has run. `plan` cannot know it, and `verify` needs it: a document
+        # whose links were repointed is no longer byte-identical to its
+        # original, and checking it against `sha1` would call a correct
+        # adoption a failure.
         return {
             "from": self.frm, "to": self.to, "role": self.role,
-            "merge": self.merge, "sha1": self.sha1,
+            "merge": self.merge, "sha1": self.sha1, "sha1After": None,
             "bytes": self.bytes, "why": self.why,
         }
 
@@ -293,6 +298,10 @@ def write_mapping(root: Path, entries: list[Entry], backup: BackupResult | None)
             "path": backup.path.name, "files": backup.files, "bytes": backup.bytes,
         },
         "gitSetup": {},
+        # `apply` fills these in: the restore tag it created, and the
+        # config keys it had to correct afterwards.
+        "tag": None,
+        "configUpdated": {},
         "files": [e.as_json() for e in entries],
     }
     target.write_text(
@@ -434,6 +443,27 @@ class Blocked(Exception):
     """A precondition failed, so nothing moved."""
 
 
+def _read_document(path: Path, root: Path) -> str:
+    """Read a markdown document, or stop with its name.
+
+    One `.md` saved in cp949 used to end the whole run in a
+    `UnicodeDecodeError` that did not say which file — at a point where a
+    backup and a restore tag already exist. Anything unreadable is a
+    `Blocked` naming the path, like every other refusal here.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise Blocked(
+            f"`{path.relative_to(root).as_posix()}` 를 UTF-8 로 읽지 못했다 — {exc.reason}. "
+            f"이 파일을 UTF-8 로 다시 저장한 뒤 다시 실행할 것"
+        ) from exc
+    except OSError as exc:
+        raise Blocked(
+            f"`{path.relative_to(root).as_posix()}` 를 읽지 못했다 — {exc}"
+        ) from exc
+
+
 def _porcelain(root: Path) -> dict[str, str]:
     """Every path git has something to say about, mapped to its status code.
 
@@ -494,6 +524,12 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     states = _porcelain(root)
     dirty = []
     for item in mapping["files"]:
+        # Only what adoption is about to touch. A half-finished edit to
+        # `CLAUDE.md`, which never moves, is ordinary work — blocking on it
+        # would make the gate about tidiness instead of about what the
+        # restore tag can bring back (spec §4: "이식 대상 밖은 통과").
+        if not item.get("to") and not item.get("merge"):
+            continue
         code = states.get(item["from"])
         if code is None:
             continue
@@ -574,19 +610,41 @@ def missing_lines(original: str, result: str) -> list[str]:
     ]
 
 
-def merge_into(root: Path, source: str, target: str, today: str | None = None) -> None:
+def merge_into(
+    root: Path, source: str, target: str,
+    today: str | None = None, moved_to: str | None = None,
+) -> None:
     """Append `source` to `target` verbatim, then drop `source`.
 
     Not a word is changed. Summarizing or reflowing here would be nicer to
     read and impossible to verify, and "nothing is lost" was the whole
     requirement.
+
+    A missing target is a refusal, not an empty head. Treating it as ""
+    created a brand new file at the target path holding only the source's
+    body — and `verify`, which only checks that the target exists and
+    contains the lines, passed. The document that was supposed to receive
+    the content got nothing. `moved_to` is where the mapping says that
+    document went, so the message can say what to write instead.
     """
     root = Path(root).resolve()
     src, dst = root / source, root / target
     stamp = today or date.today().strftime("%Y-%m-%d")
 
-    body = src.read_text(encoding="utf-8")
-    head = dst.read_text(encoding="utf-8") if dst.is_file() else ""
+    if not dst.is_file():
+        hint = (
+            f" — 매핑을 보면 그 문서는 `{moved_to}` 로 옮겨졌다. "
+            f"`merge` 에는 이동 후 경로를 적을 것"
+            if moved_to else
+            " — `merge` 에는 이동 후 경로를 적고, 대상 문서가 실제로 있는지 확인할 것"
+        )
+        raise Blocked(
+            f"`{source}` 를 병합할 대상 `{target}` 가 없다{hint}. "
+            f"아무것도 병합하지 않았다"
+        )
+
+    body = _read_document(src, root)
+    head = _read_document(dst, root)
     if head and not head.endswith("\n"):
         head += "\n"
 
@@ -869,7 +927,7 @@ def broken_links(root: Path) -> list[tuple[str, str]]:
     for path in _markdown(root):
         doc_rel = path.relative_to(root).as_posix()
         here = Path(doc_rel).parent
-        for line, is_code in _outside_code(path.read_text(encoding="utf-8")):
+        for line, is_code in _outside_code(_read_document(path, root)):
             if is_code:
                 continue
             dests = [dest for _, _, _, dest, _, _, _ in _iter_inline_links(line)]
@@ -885,10 +943,57 @@ def broken_links(root: Path) -> list[tuple[str, str]]:
     return broken
 
 
+BLANK_DEST = "·"
+
+
+def link_skeleton(text: str) -> str:
+    """`text` with every relative link destination blanked out.
+
+    Two documents with the same skeleton differ only in where their links
+    point, which is exactly what `apply` is allowed to change and nothing
+    else. This is how the narrowed promise stays checkable: a moved
+    document is no longer byte-identical to its original once a link inside
+    it was repointed, but everything around those destinations still has to
+    be the same text, and the untouched backup copy is what it is compared
+    against. External links are left alone so a changed URL still shows up.
+    """
+    out = []
+    for line, is_code in _outside_code(text):
+        if is_code:
+            out.append(line)
+            continue
+
+        blanked = []
+        pos = 0
+        for start, end, opening, dest, anchor, title, angled in _iter_inline_links(line):
+            blanked.append(line[pos:start])
+            body = dest if EXTERNAL.match(dest) else BLANK_DEST
+            blanked.append(f"{opening}{f'<{body}>' if angled else body}{anchor}{title})")
+            pos = end
+        blanked.append(line[pos:])
+        line = "".join(blanked)
+
+        def blank_reference(match):
+            if EXTERNAL.match(match.group(2)):
+                return match.group(0)
+            return f"{match.group(1)}{BLANK_DEST}{match.group(3)}"
+
+        def blank_attr(match):
+            if EXTERNAL.match(match.group(3)):
+                return match.group(0)
+            return f"{match.group(1)}{match.group(2)}{BLANK_DEST}{match.group(2)}"
+
+        line = REFERENCE_LINK.sub(blank_reference, line)
+        out.append(HTML_ATTR.sub(blank_attr, line))
+    return "\n".join(out)
+
+
 @dataclass
 class VerifyResult:
     ok: bool = True
     failures: list[str] = field(default_factory=list)
+    tag: str | None = None
+    backup: str | None = None
 
     def fail(self, message: str) -> None:
         self.ok = False
@@ -901,6 +1006,63 @@ def _write_mapping_payload(root: Path, payload: dict) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8", newline="\n",
     )
+
+
+def update_config(root: Path, mapping: dict) -> dict:
+    """Make `.claude/girok.json` describe where the documents now are.
+
+    Without this the tool prints "성공 · 유실 없음" and girok is broken in
+    that repository the same minute: the files are at `PROGRESS.md` and
+    `docs/decisions/`, the config still says `STATE.md` and `decisions/`,
+    and every check that reads the config reports a missing board.
+
+    Only keys adoption actually made true are touched, and only when they
+    disagree. `docRoots` gains `docs` at the front rather than being
+    replaced — documents landed there, but the roots the repository already
+    declared are not ours to drop.
+    """
+    root = Path(root).resolve()
+    cfg = notes_config.load(root)
+    if cfg.source is None:
+        # No config file: the defaults are already the standard layout the
+        # documents just moved to, and inventing a config here is
+        # `notes_init`'s job, not a side effect of moving files.
+        return {}
+
+    notes_rel = cfg.notes_dir.resolve().relative_to(root).as_posix()
+    notes = "" if notes_rel == "." else notes_rel + "/"
+    landed = [item["to"] for item in mapping["files"] if item.get("to")]
+    raw = json.loads(cfg.source.read_text(encoding="utf-8"))
+    changed: dict = {}
+
+    board = notes_config.DEFAULT_BOARD
+    if f"{notes}{board}" in landed and (raw.get("board") or board) != board:
+        raw["board"] = board
+        changed["board"] = board
+
+    decisions = notes_config.DEFAULT_DECISIONS_DIR
+    if (
+        any(t.startswith(f"{notes}{decisions}/") for t in landed)
+        and (raw.get("decisionsDir") or decisions) != decisions
+    ):
+        raw["decisionsDir"] = decisions
+        changed["decisionsDir"] = decisions
+
+    docs = notes_config.DEFAULT_DOC_ROOTS[0]
+    roots = list(raw.get("docRoots") or [])
+    if (
+        any(t.startswith(f"{notes}{docs}/") for t in landed)
+        and roots and docs not in roots
+    ):
+        raw["docRoots"] = [docs, *roots]
+        changed["docRoots"] = raw["docRoots"]
+
+    if changed:
+        cfg.source.write_text(
+            json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8", newline="\n",
+        )
+    return changed
 
 
 def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
@@ -950,12 +1112,22 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     tag = f"girok-adopt-before-{stamp}"
     run_git(root, "tag", tag)
 
+    # Recorded now rather than at the end, so a `verify` run days later —
+    # or after a failure below — names the tag that exists instead of
+    # rebuilding one out of today's date.
+    mapping["tag"] = tag
+    mapping["backup"] = {
+        "path": saved.path.name, "files": saved.files, "bytes": saved.bytes,
+    }
+    _write_mapping_payload(root, mapping)
+
     # From here on, the safety net (backup folder + restore tag) already
-    # exists. If anything below raises `Blocked` — a collision, a
-    # self-merge, a `git mv`/`git rm` failure mid-move — the person is
-    # mid-operation with some files possibly already moved. Attaching the
-    # tag and backup name to the exception lets `main()` tell them exactly
-    # how to undo it, instead of leaving them to guess whether it is safe.
+    # exists. If anything below fails — a collision, a self-merge, a
+    # `git mv`/`git rm` failure mid-move, an unreadable file, a full disk —
+    # the person is mid-operation with some files possibly already moved.
+    # Attaching the tag and backup name to the exception lets `main()` tell
+    # them exactly how to undo it, instead of leaving them to guess whether
+    # it is safe.
     try:
         cfg = notes_config.load(root)
         for item in mapping["files"]:
@@ -994,12 +1166,30 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         plain = [i for i in mapping["files"] if not i.get("merge")]
 
         moved = move_all(root, {"files": plain})
+        origins = {to: frm for frm, to in moved}
+        # Where each planned document ended up, so a `merge` written with
+        # the name a person read off the mapping can be told what to say.
+        landed_at = {item["from"]: item["to"] for item in plain if item.get("to")}
         for item in merges:
-            merge_into(root, item["from"], item["merge"], today=None)
+            merge_into(
+                root, item["from"], item["merge"], today=None,
+                moved_to=landed_at.get(item["merge"]),
+            )
             moved.append((item["from"], item["merge"]))
 
-        rewritten = rewrite_links(root, moved)
-    except Blocked as exc:
+        rewritten = rewrite_links(root, moved, origins)
+
+        # The hash of what actually landed, after link rewriting. `verify`
+        # checks against this; `sha1` stays as the original so the two can
+        # be compared to say whether anything beyond a link changed.
+        for item in mapping["files"]:
+            if item.get("merge") or not item.get("to"):
+                continue
+            landed = root / item["to"]
+            item["sha1After"] = sha1_of(landed) if landed.is_file() else None
+
+        config_updated = update_config(root, mapping)
+    except Exception as exc:
         exc.tag = tag
         exc.backup_name = saved.path.name
         raise
@@ -1009,10 +1199,8 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         "secrets": setup.secrets, "large": setup.large,
         "alreadyTracked": setup.already_tracked, "remote": setup.remote,
     }
-    mapping["backup"] = {
-        "path": saved.path.name, "files": saved.files, "bytes": saved.bytes,
-    }
     mapping["brokenBefore"] = [list(pair) for pair in broken_before]
+    mapping["configUpdated"] = config_updated
     _write_mapping_payload(root, mapping)
 
     if setup.init:
@@ -1023,6 +1211,10 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         touched = {MAPPING_RELATIVE.as_posix()}
         touched.update(to for _, to in moved)
         touched.update(rewritten)
+        if config_updated:
+            touched.add(
+                notes_config.load(root).source.relative_to(root).as_posix()
+            )
         run_git(root, "add", "--", *sorted(touched))
     run_git(root, "commit", "-m", "feat: girok 이식")
 
@@ -1039,20 +1231,63 @@ def verify(root: Path) -> VerifyResult:
         result.fail("매핑 파일이 없다 — 무엇을 옮겼는지 알 수 없으므로 검증할 수 없다")
         return result
 
+    result.tag = mapping.get("tag")
+    saved = mapping.get("backup") or {}
+    result.backup = saved.get("path")
+    backup_path = root.parent / saved["path"] if saved.get("path") else None
+    merge_targets = {i["merge"] for i in mapping["files"] if i.get("merge")}
+
     for item in mapping["files"]:
-        landed = item.get("to") or item.get("merge") or item["from"]
+        # `merge` first: an item may carry a stale `to` from before someone
+        # decided to merge it instead, and that `to` names a path nothing
+        # ever created.
+        landed = item.get("merge") or item.get("to") or item["from"]
         path = root / landed
         if not path.is_file():
             result.fail(f"{landed} 가 없다 (원래 {item['from']})")
             continue
-        if item.get("merge"):
+        if item.get("merge") or not item.get("to"):
             continue
-        if item.get("to") and sha1_of(path) != item["sha1"]:
-            result.fail(f"{landed} 의 내용이 원본과 다르다")
 
-    saved = mapping.get("backup") or {}
-    if saved.get("path"):
-        backup_path = root.parent / saved["path"]
+        after = item.get("sha1After")
+        expected = after or item["sha1"]
+        if sha1_of(path) != expected:
+            result.fail(f"{landed} 의 내용이 이식 직후와 다르다 (원래 {item['from']})")
+            continue
+        if not after or after == item["sha1"]:
+            # Byte-identical to the original: nothing more to prove.
+            continue
+
+        # `apply` repointed a link inside this document, so it cannot be
+        # byte-identical. The narrower promise — nothing but link
+        # destinations changed — is checked against the untouched backup,
+        # the one copy that cannot have been rewritten by anything here.
+        original = backup_path / item["from"] if backup_path else None
+        if original is None or not original.is_file():
+            result.fail(
+                f"{landed} 는 링크가 재작성돼 원본과 바이트가 다르다 — "
+                f"백업의 {item['from']} 가 없어 나머지 내용이 그대로인지 대조할 수 없다"
+            )
+            continue
+        before = link_skeleton(_read_document(original, backup_path))
+        now = link_skeleton(_read_document(path, root))
+        if landed in merge_targets:
+            # Another document was appended into this one, so it is longer
+            # than the original by design. Every original line still has to
+            # be there; the appended half is checked below, against its own
+            # source.
+            dropped = missing_lines(before, now)
+            if dropped:
+                result.fail(
+                    f"{landed} 에서 원본({item['from']})의 {len(dropped)}줄이 사라졌다 — "
+                    f"첫 줄: {dropped[0][:40]}"
+                )
+        elif before != now:
+            result.fail(
+                f"{landed} 의 링크 목적지 밖 내용이 원본({item['from']})과 다르다"
+            )
+
+    if backup_path:
         for item in mapping["files"]:
             if not item.get("merge"):
                 continue
@@ -1072,11 +1307,46 @@ def verify(root: Path) -> VerifyResult:
                 )
 
     baseline = {tuple(pair) for pair in mapping.get("brokenBefore", [])}
-    for doc, link in broken_links(root):
+    try:
+        found = broken_links(root)
+    except Blocked as exc:
+        # An unreadable document is a verification that could not finish,
+        # never a pass.
+        result.fail(str(exc))
+        found = []
+    for doc, link in found:
         if (doc, link) in baseline:
             continue
         result.fail(f"{doc} 의 링크가 깨졌다 — {link}")
     return result
+
+
+def restore_guidance(tag: str | None, backup_name: str | None) -> list[str]:
+    """How to undo an adoption, in the order that actually works.
+
+    The backup folder comes first because it is the only complete answer.
+    `git checkout <tag> -- .` brings the old paths back but leaves the
+    copies already at the new paths, so the repository ends up holding both
+    and the next `apply` blocks on the leftovers.
+    """
+    lines = ["복원하려면:"]
+    if backup_name:
+        lines += [
+            "  1) 지금 저장소 폴더를 다른 이름으로 옮겨둔다",
+            f"  2) 백업 폴더 {backup_name} 을 원래 저장소 이름으로 되돌린다",
+            "  (백업은 손대기 전 원본 전체이므로 이것이 가장 확실하다)",
+        ]
+    if tag:
+        lines += [
+            f"git 으로 되돌리려면 태그 {tag} 를 쓴다 — 옛 경로만 골라 되살리면 이미",
+            "옮겨진 새 경로의 사본이 남아 문서가 둘로 갈린다. 통째로 되돌릴 것:",
+            f"  git reset --hard {tag}",
+            "  git clean -fd    # 새 경로에 남은 사본을 지운다. 무관한 미추적 파일도",
+            "                   # 함께 지워지니 먼저 `git clean -nd` 로 확인할 것",
+        ]
+    else:
+        lines.append("매핑에 복원 태그가 없다 — `git tag` 로 girok-adopt-before-* 를 확인할 것")
+    return lines
 
 
 def main(argv: list[str] | None = None) -> int:

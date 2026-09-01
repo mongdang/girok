@@ -105,3 +105,57 @@ def test_tracked_source_blocks_instead_of_silently_deleting(repo, monkeypatch):
         notes_adopt.merge_into(repo, "STATE.md", "PROGRESS.md", today="2026-09-01")
 
     assert (repo / "STATE.md").exists()
+
+
+def test_merging_into_a_document_that_is_not_there_is_blocked(repo):
+    # A missing target used to mean `head=""`: a brand new file at the old
+    # path holding only the source's body, committed, while the document
+    # that was supposed to receive it got nothing. `verify` passed.
+    with pytest.raises(notes_adopt.Blocked) as excinfo:
+        notes_adopt.merge_into(repo, "STATE.md", "docs/없는문서.md", today="2026-09-01")
+
+    assert "docs/없는문서.md" in str(excinfo.value)
+    assert not (repo / "docs" / "없는문서.md").exists()
+    assert (repo / "STATE.md").is_file(), "원본을 지우지 않아야 한다"
+
+
+def test_a_merge_target_that_moved_says_where_it_went(repo):
+    with pytest.raises(notes_adopt.Blocked) as excinfo:
+        notes_adopt.merge_into(
+            repo, "STATE.md", "옛이름.md", today="2026-09-01", moved_to="docs/새이름.md",
+        )
+
+    assert "docs/새이름.md" in str(excinfo.value)
+
+
+def test_apply_blocks_a_merge_written_with_the_pre_move_name(tmp_path):
+    # The person reads the mapping and writes `merge: "STATE.md"` — the name
+    # they see. By the time merges run, `STATE.md` is already `PROGRESS.md`.
+    import json
+
+    root = tmp_path / "proj"
+    write(root / ".claude" / "girok.json", json.dumps({
+        "notesDir": ".", "board": "STATE.md", "decisionsDir": "decisions",
+        "adrStyle": "adr-prefixed",
+    }))
+    write(root / "STATE.md", "# 현황\n")
+    write(root / "메모.md", "# 메모\n\n측정 중\n")
+    notes_adopt.run_git(root, "init")
+    notes_adopt.run_git(root, "config", "user.email", "t@example.invalid")
+    notes_adopt.run_git(root, "config", "user.name", "t")
+    notes_adopt.run_git(root, "add", "-A")
+    notes_adopt.run_git(root, "commit", "-m", "init")
+    notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
+    mapping = notes_adopt.read_mapping(root)
+    for item in mapping["files"]:
+        if item["from"] == "메모.md":
+            item["role"] = "doc"
+            item["to"] = None
+            item["merge"] = "STATE.md"
+    notes_adopt._write_mapping_payload(root, mapping)
+
+    with pytest.raises(notes_adopt.Blocked) as excinfo:
+        notes_adopt.apply(root, today="20260901")
+
+    assert "PROGRESS.md" in str(excinfo.value)
+    assert not (root / "STATE.md").is_file()
