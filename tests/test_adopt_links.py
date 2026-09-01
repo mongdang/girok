@@ -202,3 +202,46 @@ def test_a_link_after_an_unclosed_fence_is_left_alone(tmp_path):
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert "[전](docs/decisions/ADR-001-first.md)" in text
     assert "[후](decisions/001-first.md)" in text
+
+
+def test_a_link_inside_a_document_that_moved_follows_too(tmp_path):
+    # The referring document is itself in the move list — its links were
+    # written relative to where it used to be, so resolving them from the
+    # new parent looks up a path no mapping knows.
+    root = tmp_path / "r"
+    write(root / "docs" / "decisions" / "ADR-001-a.md", "[다음](002-b.md)\n")
+    write(root / "docs" / "decisions" / "ADR-002-b.md", "# b\n")
+
+    changed = notes_adopt.rewrite_links(root, [
+        ("decisions/001-a.md", "docs/decisions/ADR-001-a.md"),
+        ("decisions/002-b.md", "docs/decisions/ADR-002-b.md"),
+    ])
+
+    assert changed == ["docs/decisions/ADR-001-a.md"]
+    text = (root / "docs" / "decisions" / "ADR-001-a.md").read_text(encoding="utf-8")
+    assert "(ADR-002-b.md)" in text
+
+
+def test_a_moved_document_relinks_to_a_file_that_stayed(tmp_path):
+    # Moving a document breaks its links to documents that did not move,
+    # because the same relative path now resolves from a different parent.
+    root = tmp_path / "r"
+    write(root / "docs" / "설계.md", "[메모](메모.md)\n")
+    write(root / "design" / "메모.md", "# 메모\n")
+
+    notes_adopt.rewrite_links(root, [("design/설계.md", "docs/설계.md")])
+
+    text = (root / "docs" / "설계.md").read_text(encoding="utf-8")
+    assert "(../design/메모.md)" in text
+
+
+def test_a_link_that_was_already_broken_is_not_invented(tmp_path):
+    # Nothing at the old path either — this link was dead before adoption
+    # and guessing a new destination for it would be a fabrication.
+    root = tmp_path / "r"
+    write(root / "docs" / "설계.md", "[없다](없는문서.md)\n")
+
+    changed = notes_adopt.rewrite_links(root, [("design/설계.md", "docs/설계.md")])
+
+    assert changed == []
+    assert "(없는문서.md)" in (root / "docs" / "설계.md").read_text(encoding="utf-8")

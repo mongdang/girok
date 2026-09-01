@@ -717,35 +717,59 @@ def _iter_inline_links(line: str):
         pos = end
 
 
-def _retarget(doc_rel: str, link: str, moves: dict[str, str]) -> str | None:
-    """The new relative link, or None if this one does not point at a move.
+def _retarget(
+    doc_rel: str, link: str, moves: dict[str, str],
+    origin_rel: str | None = None, root: Path | None = None,
+) -> str | None:
+    """The new relative link, or None if this one needs no change.
 
     `link` is percent-decoded before it is matched against the moves table —
     `my%20file.md` and `my file.md` name the same file. The anchor rides
     along separately and is never touched by this.
+
+    `origin_rel` is where the *referring* document was when this link was
+    written. It matters whenever that document moved too: the link resolves
+    from the old parent and has to be written relative to the new one.
+    Resolving from the new parent instead looks up a path the moves table
+    has never heard of, which is why link rewriting silently did nothing in
+    exactly the case it exists for — `decisions/` becoming
+    `docs/decisions/`.
     """
     if EXTERNAL.match(link):
         return None
     here = Path(doc_rel).parent
+    origin = Path(origin_rel).parent if origin_rel else here
     try:
-        target = (here / unquote(link)).as_posix()
+        target = (origin / unquote(link)).as_posix()
         target = Path(os.path.normpath(target)).as_posix()
     except ValueError:
         return None
     moved_to = moves.get(target)
     if moved_to is None:
-        return None
-    return os.path.relpath(moved_to, here.as_posix() or ".").replace("\\", "/")
+        # The destination stayed put but this document did not, so the same
+        # relative path now resolves somewhere else. Only rewrite when the
+        # old path really held a file: a link that was already dead is not
+        # ours to invent a destination for.
+        if origin_rel is None or origin_rel == doc_rel or root is None:
+            return None
+        if not (root / target).exists():
+            return None
+        moved_to = target
+    new = os.path.relpath(moved_to, here.as_posix() or ".").replace("\\", "/")
+    return None if new == unquote(link) else new
 
 
-def _rewrite_inline_links(line: str, doc_rel: str, moves: dict[str, str]) -> tuple[str, int]:
+def _rewrite_inline_links(
+    line: str, doc_rel: str, moves: dict[str, str],
+    origin_rel: str | None = None, root: Path | None = None,
+) -> tuple[str, int]:
     """Rewrite every `[text](dest)` / `![alt](dest)` in a line."""
     changed = 0
     out = []
     pos = 0
     for start, end, opening, dest, anchor, title, angled in _iter_inline_links(line):
         out.append(line[pos:start])
-        new_dest = _retarget(doc_rel, dest, moves)
+        new_dest = _retarget(doc_rel, dest, moves, origin_rel, root)
         if new_dest is None:
             out.append(line[start:end])
         else:
@@ -757,13 +781,16 @@ def _rewrite_inline_links(line: str, doc_rel: str, moves: dict[str, str]) -> tup
     return "".join(out), changed
 
 
-def _rewrite_html_attrs(line: str, doc_rel: str, moves: dict[str, str]) -> tuple[str, int]:
+def _rewrite_html_attrs(
+    line: str, doc_rel: str, moves: dict[str, str],
+    origin_rel: str | None = None, root: Path | None = None,
+) -> tuple[str, int]:
     """Rewrite `src="..."` / `href='...'` in embedded HTML."""
     changed = 0
 
     def swap(match):
         nonlocal changed
-        new = _retarget(doc_rel, match.group(3), moves)
+        new = _retarget(doc_rel, match.group(3), moves, origin_rel, root)
         if new is None:
             return match.group(0)
         changed += 1
@@ -772,7 +799,9 @@ def _rewrite_html_attrs(line: str, doc_rel: str, moves: dict[str, str]) -> tuple
     return HTML_ATTR.sub(swap, line), changed
 
 
-def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> list[str]:
+def rewrite_links(
+    root: Path, moves: list[tuple[str, str]], origins: dict[str, str] | None = None,
+) -> list[str]:
     """Point every relative link at where its document went.
 
     Returns the repository-root-relative paths of documents this actually
@@ -782,12 +811,23 @@ def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> list[str]:
     """
     root = Path(root).resolve()
     table = dict(moves)
+    # Where each moved document used to be. Its links were written from
+    # there, so that is where they have to be resolved from.
+    #
+    # A merge belongs in `moves` (references to the source now point at the
+    # target) but never in `origins`: the target did not come from the
+    # source, it merely received it, and a caller that mixes the two makes
+    # every link in the target resolve from the wrong folder. `apply` passes
+    # the move list explicitly for that reason.
+    if origins is None:
+        origins = {new: old for old, new in moves}
     touched = []
 
     for path in _markdown(root):
         doc_rel = path.relative_to(root).as_posix()
         # A document that itself moved is already at its new path.
-        original = path.read_text(encoding="utf-8")
+        origin_rel = origins.get(doc_rel, doc_rel)
+        original = _read_document(path, root)
         lines = []
         changed = 0
         for line, is_code in _outside_code(original):
@@ -795,19 +835,19 @@ def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> list[str]:
                 lines.append(line)
                 continue
 
-            line, n = _rewrite_inline_links(line, doc_rel, table)
+            line, n = _rewrite_inline_links(line, doc_rel, table, origin_rel, root)
             changed += n
 
-            def swap_reference(match, doc=doc_rel):
+            def swap_reference(match, doc=doc_rel, origin=origin_rel):
                 nonlocal changed
-                new = _retarget(doc, match.group(2), table)
+                new = _retarget(doc, match.group(2), table, origin, root)
                 if new is None:
                     return match.group(0)
                 changed += 1
                 return f"{match.group(1)}{new}{match.group(3)}"
 
             line = REFERENCE_LINK.sub(swap_reference, line)
-            line, n = _rewrite_html_attrs(line, doc_rel, table)
+            line, n = _rewrite_html_attrs(line, doc_rel, table, origin_rel, root)
             changed += n
             lines.append(line)
 
