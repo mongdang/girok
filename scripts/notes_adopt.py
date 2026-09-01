@@ -871,50 +871,62 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         # just wrote goes in.
         run_git(root, "add", "--", ".gitignore")
         run_git(root, "commit", "-m", "chore: girok 이식 전 상태")
-    run_git(root, "tag", f"girok-adopt-before-{stamp}")
+    tag = f"girok-adopt-before-{stamp}"
+    run_git(root, "tag", tag)
 
-    cfg = notes_config.load(root)
-    for item in mapping["files"]:
-        target = item.get("to")
-        # The board's destination ("PROGRESS.md") is this methodology's own
-        # fixed name, not derived from whatever the person called it —
-        # there is nothing of theirs left in it to normalize.
-        if not target or item["role"] == "board":
-            continue
-        parent = Path(target).parent
-        name = normalize_name(Path(target).name, item["role"], cfg.adr_style)
-        item["to"] = (parent / name).as_posix() if parent.as_posix() != "." else name
+    # From here on, the safety net (backup folder + restore tag) already
+    # exists. If anything below raises `Blocked` — a collision, a
+    # self-merge, a `git mv`/`git rm` failure mid-move — the person is
+    # mid-operation with some files possibly already moved. Attaching the
+    # tag and backup name to the exception lets `main()` tell them exactly
+    # how to undo it, instead of leaving them to guess whether it is safe.
+    try:
+        cfg = notes_config.load(root)
+        for item in mapping["files"]:
+            target = item.get("to")
+            # The board's destination ("PROGRESS.md") is this methodology's
+            # own fixed name, not derived from whatever the person called
+            # it — there is nothing of theirs left in it to normalize.
+            if not target or item["role"] == "board":
+                continue
+            parent = Path(target).parent
+            name = normalize_name(Path(target).name, item["role"], cfg.adr_style)
+            item["to"] = (parent / name).as_posix() if parent.as_posix() != "." else name
 
-    destinations: dict[str, list[str]] = {}
-    for item in mapping["files"]:
-        if item.get("to"):
-            destinations.setdefault(item["to"], []).append(item["from"])
-    for dest, sources in destinations.items():
-        if len(sources) > 1:
-            raise Blocked(
-                f"{len(sources)}개 문서가 정규화 후 같은 자리로 겹친다 — "
-                f"{', '.join(sources)} 모두 `{dest}` 가 된다. 이름을 정리하고 "
-                f"다시 실행할 것 (자동으로 번호를 붙여 해결하지 않는다)"
-            )
+        destinations: dict[str, list[str]] = {}
+        for item in mapping["files"]:
+            if item.get("to"):
+                destinations.setdefault(item["to"], []).append(item["from"])
+        for dest, sources in destinations.items():
+            if len(sources) > 1:
+                raise Blocked(
+                    f"{len(sources)}개 문서가 정규화 후 같은 자리로 겹친다 — "
+                    f"{', '.join(sources)} 모두 `{dest}` 가 된다. 이름을 정리하고 "
+                    f"다시 실행할 것 (자동으로 번호를 붙여 해결하지 않는다)"
+                )
 
-    for item in mapping["files"]:
-        if item.get("merge") and item["merge"] == item["from"]:
-            raise Blocked(
-                f"`{item['from']}` 를 자기 자신에 병합할 수 없다 — 내용을 이어붙인 뒤 "
-                f"원본을 지우면 문서가 그대로 사라진다"
-            )
+        for item in mapping["files"]:
+            if item.get("merge") and item["merge"] == item["from"]:
+                raise Blocked(
+                    f"`{item['from']}` 를 자기 자신에 병합할 수 없다 — 내용을 이어붙인 뒤 "
+                    f"원본을 지우면 문서가 그대로 사라진다"
+                )
 
-    broken_before = broken_links(root)
+        broken_before = broken_links(root)
 
-    merges = [i for i in mapping["files"] if i.get("merge")]
-    plain = [i for i in mapping["files"] if not i.get("merge")]
+        merges = [i for i in mapping["files"] if i.get("merge")]
+        plain = [i for i in mapping["files"] if not i.get("merge")]
 
-    moved = move_all(root, {"files": plain})
-    for item in merges:
-        merge_into(root, item["from"], item["merge"], today=None)
-        moved.append((item["from"], item["merge"]))
+        moved = move_all(root, {"files": plain})
+        for item in merges:
+            merge_into(root, item["from"], item["merge"], today=None)
+            moved.append((item["from"], item["merge"]))
 
-    rewritten = rewrite_links(root, moved)
+        rewritten = rewrite_links(root, moved)
+    except Blocked as exc:
+        exc.tag = tag
+        exc.backup_name = saved.path.name
+        raise
 
     mapping["gitSetup"] = {
         "init": setup.init, "gitignoreAdded": setup.gitignore_added,
@@ -1022,6 +1034,15 @@ def main(argv: list[str] | None = None) -> int:
             moved = apply(root)
         except (BackupFailed, Blocked) as exc:
             print(f"[중단] {exc}")
+            tag = getattr(exc, "tag", None)
+            backup_name = getattr(exc, "backup_name", None)
+            if tag and backup_name:
+                # A backup and restore tag were already made before this
+                # failed — some files may already be staged as moved.
+                print("git mv/git rm 으로 스테이징된 이동이 인덱스에 남아 있을 수 있다.")
+                print("복원하려면:")
+                print(f"  git checkout {tag} -- .")
+                print(f"  또는 백업 폴더 {backup_name} 에서 통째로 되돌릴 것")
             return 1
         for frm, to in moved:
             print(f"[이동] {frm} → {to}")

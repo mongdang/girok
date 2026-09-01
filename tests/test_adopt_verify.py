@@ -177,3 +177,47 @@ def test_apply_without_a_plan_is_blocked_and_touches_nothing(tmp_path):
     assert not (root.parent / f"{root.name}-girok-backup-20260901").exists()
     tags = notes_adopt.run_git(root, "tag").stdout
     assert "girok-adopt-before-20260901" not in tags
+
+
+def test_a_mid_move_failure_names_the_real_tag_and_backup(adopted, monkeypatch, capsys):
+    # A backup and restore tag already exist by the time `move_all` runs —
+    # the person needs to be told exactly how to use them, not just that
+    # something broke.
+    import subprocess
+
+    real_run_git = notes_adopt.run_git
+
+    def failing_mv(root, *args):
+        if args and args[0] == "mv":
+            return subprocess.CompletedProcess(args, 1, stdout="", stderr="fatal: mv failed")
+        return real_run_git(root, *args)
+
+    monkeypatch.setattr(notes_adopt, "run_git", failing_mv)
+
+    code = notes_adopt.main(["apply", "--root", str(adopted), "--confirm", adopted.name])
+
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "girok-adopt-before-20" in out  # real tag, not a placeholder
+    assert f"{adopted.name}-girok-backup-20" in out  # real backup folder name
+    assert "git checkout girok-adopt-before-20" in out
+
+
+def test_a_pre_backup_failure_gives_no_restore_guidance(tmp_path, capsys):
+    # Nothing was written yet (no mapping, so `apply` refuses immediately)
+    # — telling the person to restore something that was never touched
+    # invents a problem that does not exist.
+    root = tmp_path / "proj"
+    write(root / "STATE.md", "# 현황\n")
+    notes_adopt.run_git(root, "init")
+    notes_adopt.run_git(root, "config", "user.email", "t@example.invalid")
+    notes_adopt.run_git(root, "config", "user.name", "t")
+    notes_adopt.run_git(root, "add", "-A")
+    notes_adopt.run_git(root, "commit", "-m", "init")
+
+    code = notes_adopt.main(["apply", "--root", str(root), "--confirm", root.name])
+
+    assert code == 1
+    out = capsys.readouterr().out
+    assert "복원" not in out
+    assert "checkout" not in out
