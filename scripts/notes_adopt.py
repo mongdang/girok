@@ -283,10 +283,11 @@ JUNK_PATTERNS = (
 )
 
 # Names that usually hold a credential. Ignoring one is cheap; committing
-# one is a rotation.
+# one is a rotation. The prefixes end in "." so a document like
+# `secrets-policy.md` does not fall in — only `secrets.<ext>` does.
 SECRET_NAMES = (".env",)
 SECRET_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
-SECRET_PREFIXES = ("credentials", "secrets", ".env.")
+SECRET_PREFIXES = ("credentials.", "secrets.", ".env.")
 
 
 @dataclass
@@ -295,6 +296,7 @@ class GitSetup:
     gitignore_added: list[str] = field(default_factory=list)
     secrets: list[str] = field(default_factory=list)
     large: list[str] = field(default_factory=list)
+    already_tracked: list[str] = field(default_factory=list)
     remote: str | None = None
 
 
@@ -307,6 +309,9 @@ def run_git(root: Path, *args: str) -> subprocess.CompletedProcess:
 
 def _looks_secret(name: str) -> bool:
     lowered = name.lower()
+    if lowered.endswith(".md"):
+        # Markdown is this methodology's own subject matter, never a secret.
+        return False
     return (
         lowered in SECRET_NAMES
         or lowered.endswith(SECRET_SUFFIXES)
@@ -319,6 +324,26 @@ def _remote_of(root: Path) -> str | None:
     if result.returncode != 0:
         return None
     return (result.stdout.split() or [None])[0]
+
+
+def _tracked_files(root: Path) -> set[str]:
+    result = run_git(root, "ls-files")
+    if result.returncode != 0:
+        return set()
+    return set(result.stdout.splitlines())
+
+
+def _files_under(root: Path):
+    """Every file under `root`, `.git` pruned before descending into it.
+
+    `.git` holds the object database — on a repository with real history
+    that is most of the tree, and `git_setup` has no business reading it.
+    """
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d != ".git")
+        here = Path(dirpath)
+        for name in sorted(filenames):
+            yield here / name
 
 
 def git_setup(root: Path) -> GitSetup:
@@ -340,18 +365,17 @@ def git_setup(root: Path) -> GitSetup:
         run_git(root, "init")
         setup.init = True
 
-    for path in sorted(root.rglob("*")):
+    tracked = _tracked_files(root)
+    for path in _files_under(root):
         if not path.is_file() or path.is_symlink():
             continue
         rel = path.relative_to(root).as_posix()
-        if rel.startswith(".git/"):
-            continue
         if _looks_secret(path.name):
-            setup.secrets.append(rel)
+            (setup.already_tracked if rel in tracked else setup.secrets).append(rel)
         elif path.stat().st_size > LARGE_BYTES:
-            setup.large.append(rel)
+            (setup.already_tracked if rel in tracked else setup.large).append(rel)
 
-    wanted = list(JUNK_PATTERNS) + setup.secrets + setup.large
+    wanted = list(JUNK_PATTERNS) + setup.secrets + setup.large + setup.already_tracked
     gitignore = root / ".gitignore"
     existing = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
     present = {line.strip() for line in existing.splitlines()}
@@ -362,6 +386,18 @@ def git_setup(root: Path) -> GitSetup:
         text = existing if existing.endswith("\n") or not existing else existing + "\n"
         gitignore.write_text(text + block, encoding="utf-8", newline="\n")
         setup.gitignore_added = missing
+
+    if setup.already_tracked:
+        # Match main()'s stream setup — Windows defaults stdout to the system
+        # codepage, which cannot encode this Korean text and would crash.
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        print(
+            "[주의] 다음 파일은 이미 git 에 커밋되어 있어 .gitignore 를 추가해도 "
+            "빠지지 않는다 — 이력을 지우려면 이력을 다시 써야 하는데 이 방법론은 "
+            "그것을 금지한다. 비밀이 들어 있다면 값을 폐기·교체하는 것이 답이다: "
+            + ", ".join(setup.already_tracked)
+        )
 
     setup.remote = _remote_of(root)
     return setup

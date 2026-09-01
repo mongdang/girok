@@ -98,3 +98,43 @@ def test_a_missing_remote_is_reported_not_fatal(bare_project):
     result = notes_adopt.git_setup(bare_project)
 
     assert result.remote is None
+
+
+def test_already_committed_secrets_are_reported_not_untracked(tmp_path):
+    """`.gitignore` cannot undo a commit that already happened.
+
+    Reporting an already-tracked secret as "ignored" would be a false claim
+    — git keeps tracking and committing it regardless. This has to be its
+    own bucket, not folded into `secrets`.
+    """
+    root = tmp_path / "p"
+    write(root / "pyproject.toml", "[project]\n")
+    write(root / ".env", "TOKEN=abc\n")
+    notes_adopt.run_git(root, "init")
+    notes_adopt.run_git(root, "config", "user.email", "t@example.invalid")
+    notes_adopt.run_git(root, "config", "user.name", "t")
+    notes_adopt.run_git(root, "add", ".env", "pyproject.toml")
+    notes_adopt.run_git(root, "commit", "-m", "init")
+
+    result = notes_adopt.git_setup(root)
+
+    assert result.already_tracked == [".env"]
+    assert ".env" not in result.secrets
+
+
+def test_a_documentation_file_is_not_mistaken_for_a_secret(tmp_path):
+    """A name like `secrets-policy.md` is a document, not a credential.
+
+    Silently pushing a record out of git is worse than any false negative on
+    an actual secret — this methodology's whole subject is documents.
+    """
+    root = tmp_path / "p"
+    write(root / "pyproject.toml", "[project]\n")
+    write(root / "secrets-policy.md", "# 비밀 관리 정책\n")
+    write(root / "secrets.yaml", "token: abc\n")
+
+    result = notes_adopt.git_setup(root)
+
+    assert result.secrets == ["secrets.yaml"]
+    text = (root / ".gitignore").read_text(encoding="utf-8")
+    assert "secrets-policy.md" not in text
