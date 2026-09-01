@@ -396,6 +396,119 @@ def git_setup(root: Path) -> GitSetup:
     return setup
 
 
+class Blocked(Exception):
+    """A precondition failed, so nothing moved."""
+
+
+def _porcelain(root: Path) -> dict[str, str]:
+    """Every path git has something to say about, mapped to its status code.
+
+    `-c core.quotepath=false` keeps a Korean (or any non-ASCII) path
+    readable instead of C-escaped, so it still matches a mapping entry.
+    """
+    result = run_git(root, "-c", "core.quotepath=false", "status", "--porcelain")
+    states = {}
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        code, rel = line[:2], line[3:].strip().strip('"')
+        if " -> " in rel:
+            rel = rel.split(" -> ", 1)[1]
+        states[rel] = code
+    return states
+
+
+def check_preconditions(root: Path, mapping: dict) -> None:
+    """Refuse while anything about to move is not safely committed.
+
+    The bar is not an empty `git status`. An unpushed commit is fine and so
+    is untracked noise nobody plans to touch; what cannot be allowed is a
+    file that is about to move while the restore tag has no copy of it.
+    """
+    root = Path(root).resolve()
+    git_dir = root / ".git"
+    for marker in ("MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD"):
+        if (git_dir / marker).exists():
+            raise Blocked(
+                "병합·리베이스가 끝나지 않았다 — 반쯤 합쳐진 파일을 옮길 수는 없다. "
+                "먼저 마무리할 것"
+            )
+
+    unresolved = [f["from"] for f in mapping["files"] if f["role"] == "?"]
+    if unresolved:
+        listed = ", ".join(unresolved[:5])
+        raise Blocked(
+            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 — {listed}. "
+            f"role 을 채운 뒤 다시 실행할 것"
+        )
+
+    states = _porcelain(root)
+    dirty = []
+    for item in mapping["files"]:
+        code = states.get(item["from"])
+        if code is None:
+            continue
+        dirty.append(f"{item['from']} ({code.strip() or '??'})")
+    if dirty:
+        listed = ", ".join(dirty[:5])
+        raise Blocked(
+            f"옮길 문서 {len(dirty)}개가 커밋되지 않았다 — {listed}. "
+            f"복원 태그는 커밋된 것만 담으므로 먼저 커밋할 것"
+        )
+
+
+def normalize_name(name: str, role: str, adr_style: str) -> str:
+    """A file name that sorts and reads the same everywhere.
+
+    Korean names are kept as they are: transliterating them would trade a
+    name that means something for one that does not.
+    """
+    stem, dot, suffix = name.rpartition(".")
+    if not dot:
+        stem, suffix = name, ""
+    number = None
+    match = ADR_PREFIXED.match(name) or ADR_NUMBERED.match(name)
+    if role == "adr" and match:
+        digits = re.search(r"\d+", match.group(0))
+        number = digits.group(0) if digits else None
+        stem = stem[match.end():]
+
+    stem = re.sub(r"[\s_]+", "-", stem.strip())
+    stem = re.sub(r"-{2,}", "-", stem).strip("-")
+    stem = "".join(c.lower() if c.isascii() else c for c in stem)
+
+    if role == "adr" and number:
+        prefix = f"ADR-{number}" if adr_style == "adr-prefixed" else number
+        stem = f"{prefix}-{stem}"
+    return f"{stem}.{suffix}" if suffix else stem
+
+
+def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
+    """Move every planned document with `git mv`, so history follows.
+
+    `git mv` only stages a rename — `git log --follow` walks committed
+    history, so a rename nobody committed yet is invisible to it. Committing
+    here is what makes "history follows" true rather than merely intended.
+    """
+    root = Path(root).resolve()
+    moved = []
+    for item in mapping["files"]:
+        target = item.get("to")
+        if not target or target == item["from"]:
+            continue
+        destination = root / target
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        result = run_git(root, "mv", item["from"], target)
+        if result.returncode != 0:
+            raise Blocked(
+                f"`{item['from']}` 를 옮기지 못했다 — {result.stderr.strip()}"
+            )
+        moved.append((item["from"], target))
+    if moved:
+        run_git(root, "commit", "-m", "girok notes-adopt: 문서 위치 이동")
+    return moved
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
