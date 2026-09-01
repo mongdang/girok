@@ -1,7 +1,7 @@
 {
   "name": "girok",
   "displayName": "girok",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "문서 방법론을 플러그인으로 — 현황판·결정 기록(ADR)·아카이브 분리, 문서 검사기, 실장비 프로젝트용 안전 게이트, 병행 작업 병합 규칙. 규칙의 동결 사본(.method/)이 저장소에 커밋되어 플러그인 없이도 자기완결적이다.",
   "author": {
     "name": "mongdang",
