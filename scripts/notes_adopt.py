@@ -21,8 +21,9 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -270,6 +271,100 @@ def write_mapping(root: Path, entries: list[Entry], backup: BackupResult | None)
 def read_mapping(root: Path) -> dict:
     target = Path(root).resolve() / MAPPING_RELATIVE
     return json.loads(target.read_text(encoding="utf-8"))
+
+
+LARGE_BYTES = 10 * 1024 * 1024
+
+# Build output and caches. Committing these is not dangerous, just noise
+# that makes every later diff unreadable.
+JUNK_PATTERNS = (
+    "__pycache__/", "*.pyc", "node_modules/", "build/", "dist/",
+    ".venv/", ".pytest_cache/", "bin/", "obj/",
+)
+
+# Names that usually hold a credential. Ignoring one is cheap; committing
+# one is a rotation.
+SECRET_NAMES = (".env",)
+SECRET_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
+SECRET_PREFIXES = ("credentials", "secrets", ".env.")
+
+
+@dataclass
+class GitSetup:
+    init: bool = False
+    gitignore_added: list[str] = field(default_factory=list)
+    secrets: list[str] = field(default_factory=list)
+    large: list[str] = field(default_factory=list)
+    remote: str | None = None
+
+
+def run_git(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args], cwd=root, capture_output=True,
+        text=True, encoding="utf-8", errors="replace",
+    )
+
+
+def _looks_secret(name: str) -> bool:
+    lowered = name.lower()
+    return (
+        lowered in SECRET_NAMES
+        or lowered.endswith(SECRET_SUFFIXES)
+        or lowered.startswith(SECRET_PREFIXES)
+    )
+
+
+def _remote_of(root: Path) -> str | None:
+    result = run_git(root, "remote")
+    if result.returncode != 0:
+        return None
+    return (result.stdout.split() or [None])[0]
+
+
+def git_setup(root: Path) -> GitSetup:
+    """Make this folder a repository, and keep the wrong things out of it.
+
+    Everything here resolves rather than refuses, except a workspace: a
+    `git init` one level too high swallows the repositories underneath, and
+    that is not a thing to fix afterwards.
+    """
+    root = Path(root).resolve()
+    if notes_config.is_workspace(root):
+        raise BackupFailed(
+            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 — "
+            f"여기서 git init 을 하면 하위 저장소를 통째로 삼킨다"
+        )
+
+    setup = GitSetup()
+    if not (root / ".git").exists():
+        run_git(root, "init")
+        setup.init = True
+
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith(".git/"):
+            continue
+        if _looks_secret(path.name):
+            setup.secrets.append(rel)
+        elif path.stat().st_size > LARGE_BYTES:
+            setup.large.append(rel)
+
+    wanted = list(JUNK_PATTERNS) + setup.secrets + setup.large
+    gitignore = root / ".gitignore"
+    existing = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+    present = {line.strip() for line in existing.splitlines()}
+    missing = [w for w in wanted if w not in present]
+    if missing:
+        stamp = date.today().strftime("%Y-%m-%d")
+        block = f"\n# girok:adopt {stamp}\n" + "\n".join(missing) + "\n"
+        text = existing if existing.endswith("\n") or not existing else existing + "\n"
+        gitignore.write_text(text + block, encoding="utf-8", newline="\n")
+        setup.gitignore_added = missing
+
+    setup.remote = _remote_of(root)
+    return setup
 
 
 def main(argv: list[str] | None = None) -> int:
