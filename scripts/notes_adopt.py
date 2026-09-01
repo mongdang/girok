@@ -575,6 +575,108 @@ def merge_into(root: Path, source: str, target: str, today: str | None = None) -
         src.unlink(missing_ok=True)
 
 
+# Inline `[text](path)` and `![alt](path)`, plus reference definitions
+# `[label]: path`. Anchors and titles are captured separately so they ride
+# along unchanged.
+INLINE_LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s#]+)((?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\))")
+REFERENCE_LINK = re.compile(r"(^\s*\[[^\]]+\]:\s+)([^\s#]+)((?:#\S*)?)", re.MULTILINE)
+FENCE = re.compile(r"^\s*(```|~~~)")
+EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#)", re.IGNORECASE)
+
+
+def _outside_code(text: str):
+    """Yield (line, is_code) so rewriting can skip fenced blocks.
+
+    A shell command in a code block that happens to name a moved file is
+    documentation of what someone typed, not a reference to follow.
+    """
+    fenced = False
+    for line in text.split("\n"):
+        if FENCE.match(line):
+            fenced = not fenced
+            yield line, True
+            continue
+        yield line, fenced
+
+
+def _retarget(doc_rel: str, link: str, moves: dict[str, str]) -> str | None:
+    """The new relative link, or None if this one does not point at a move."""
+    if EXTERNAL.match(link):
+        return None
+    here = Path(doc_rel).parent
+    try:
+        target = (here / link).as_posix()
+        target = Path(os.path.normpath(target)).as_posix()
+    except ValueError:
+        return None
+    moved_to = moves.get(target)
+    if moved_to is None:
+        return None
+    return os.path.relpath(moved_to, here.as_posix() or ".").replace("\\", "/")
+
+
+def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
+    """Point every relative link at where its document went."""
+    root = Path(root).resolve()
+    table = dict(moves)
+    changed = 0
+
+    for path in _markdown(root):
+        doc_rel = path.relative_to(root).as_posix()
+        # A document that itself moved is already at its new path.
+        original = path.read_text(encoding="utf-8")
+        lines = []
+        for line, is_code in _outside_code(original):
+            if is_code:
+                lines.append(line)
+                continue
+
+            def swap_inline(match, doc=doc_rel):
+                nonlocal changed
+                new = _retarget(doc, match.group(2), table)
+                if new is None:
+                    return match.group(0)
+                changed += 1
+                return f"{match.group(1)}{new}{match.group(3)}"
+
+            def swap_reference(match, doc=doc_rel):
+                nonlocal changed
+                new = _retarget(doc, match.group(2), table)
+                if new is None:
+                    return match.group(0)
+                changed += 1
+                return f"{match.group(1)}{new}{match.group(3)}"
+
+            line = INLINE_LINK.sub(swap_inline, line)
+            line = REFERENCE_LINK.sub(swap_reference, line)
+            lines.append(line)
+
+        updated = "\n".join(lines)
+        if updated != original:
+            path.write_text(updated, encoding="utf-8", newline="\n")
+    return changed
+
+
+def broken_links(root: Path) -> list[tuple[str, str]]:
+    """Relative links that point at nothing."""
+    root = Path(root).resolve()
+    broken = []
+    for path in _markdown(root):
+        doc_rel = path.relative_to(root).as_posix()
+        here = Path(doc_rel).parent
+        for line, is_code in _outside_code(path.read_text(encoding="utf-8")):
+            if is_code:
+                continue
+            for match in INLINE_LINK.finditer(line):
+                link = match.group(2)
+                if EXTERNAL.match(link):
+                    continue
+                target = Path(os.path.normpath((here / link).as_posix()))
+                if not (root / target).exists():
+                    broken.append((doc_rel, link))
+    return broken
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
