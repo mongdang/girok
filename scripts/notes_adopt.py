@@ -16,7 +16,10 @@ all, and `verify` proves after the fact that every byte survived.
     python notes_adopt.py verify
 """
 import argparse
+import hashlib
+import json
 import os
+import re
 import shutil
 import sys
 from dataclasses import dataclass
@@ -119,15 +122,175 @@ def backup(root: Path, today: str | None = None) -> BackupResult:
     return BackupResult(path=target, files=len(after), bytes=sum(after.values()))
 
 
+MAPPING_RELATIVE = Path(".claude") / "girok-adopt.json"
+
+# Read by the tools themselves from the repository root. Moving one does not
+# relocate a document, it hides it from the agent that needs it.
+ROOT_FIXED = ("CLAUDE.md", "AGENTS.md", "GEMINI.md", "RULES.md")
+
+# Folders another tool writes into and reads back by path.
+FOREIGN_DIRS = ("docs/superpowers",)
+
+SKIP_DIRS = {
+    ".git", ".vs", ".idea", "__pycache__", "node_modules", ".pytest_cache",
+    "bin", "obj", "build", "dist", "packages", "target", ".venv", ".method",
+}
+
+BOARD_HINTS = ("PROGRESS", "STATE", "STATUS", "현황")
+ADR_PREFIXED = re.compile(r"^ADR-(?:\d{3}|\d{6})[-.]")
+ADR_NUMBERED = re.compile(r"^\d{3}-")
+
+
+@dataclass
+class Entry:
+    frm: str
+    role: str
+    sha1: str
+    bytes: int
+    why: str
+    to: str | None = None
+    merge: str | None = None
+
+    def as_json(self) -> dict:
+        return {
+            "from": self.frm, "to": self.to, "role": self.role,
+            "merge": self.merge, "sha1": self.sha1,
+            "bytes": self.bytes, "why": self.why,
+        }
+
+
+def sha1_of(path: Path) -> str:
+    return hashlib.sha1(path.read_bytes()).hexdigest()
+
+
+def _markdown(root: Path) -> list[Path]:
+    found = []
+    for path in sorted(root.rglob("*.md")):
+        if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
+            continue
+        if path.is_file():
+            found.append(path)
+    return found
+
+
+def _classify(rel: str, cfg, decisions_prefix: str) -> tuple[str, str]:
+    """The role this document plays, and why the rules think so.
+
+    Only what the rules are certain about. `?` is the honest answer for the
+    rest — it costs a person one read, where a wrong guess costs a moved
+    file and a broken link.
+
+    `decisions_prefix` is the decisions folder relative to the *repository
+    root*. `cfg.decisions_dir` is an absolute Path and `decisions_relative`
+    is relative to the notes folder, so neither compares against `rel`.
+    """
+    name = Path(rel).name
+    if name in ROOT_FIXED and "/" not in rel:
+        return "rules", "도구가 저장소 루트에서 읽는 파일"
+    if any(rel.startswith(d + "/") for d in FOREIGN_DIRS):
+        return "foreign", "다른 도구가 경로로 읽는 폴더"
+    if cfg.board and name == cfg.board:
+        return "board", "girok.json 의 board"
+    decisions = decisions_prefix
+    if decisions and rel.startswith(decisions + "/"):
+        if ADR_PREFIXED.match(name) or ADR_NUMBERED.match(name):
+            return "adr", "결정 기록 폴더 안의 번호 붙은 문서"
+        return "?", "결정 기록 폴더 안이지만 ADR 이름 규칙에 안 맞는다"
+    if ADR_PREFIXED.match(name) or ADR_NUMBERED.match(name):
+        return "adr", "ADR 이름 규칙에 맞는다"
+    if "/" not in rel:
+        if any(hint in name.upper() or hint in name for hint in BOARD_HINTS):
+            return "board", "현황판으로 보이는 이름"
+        return "?", "루트에 있는 문서 — 자리를 규칙으로 정할 수 없다"
+    return "doc", "일반 문서"
+
+
+def _destination(entry: Entry, cfg, notes: str) -> str | None:
+    """Where this document goes, as a path relative to the repository root.
+
+    `notes` is "" when the notes folder is the repository root itself — the
+    `notesDir: "."` layout, which is a supported value and stays put.
+    """
+    if entry.role in ("rules", "foreign", "skip", "?"):
+        return None
+    if entry.role == "board":
+        return f"{notes}PROGRESS.md"
+    if entry.role == "adr":
+        return f"{notes}docs/decisions/{Path(entry.frm).name}"
+    return f"{notes}docs/{Path(entry.frm).name}"
+
+
+def _decisions_prefix(root: Path, cfg) -> str:
+    """The decisions folder as a path relative to the repository root."""
+    try:
+        return cfg.decisions_dir.resolve().relative_to(root).as_posix()
+    except ValueError:
+        return ""
+
+
+def plan(root: Path) -> list[Entry]:
+    """Every markdown document, with a proposed role and destination."""
+    root = Path(root).resolve()
+    cfg = notes_config.load(root)
+    decisions = _decisions_prefix(root, cfg)
+    notes_rel = cfg.notes_dir.resolve().relative_to(root).as_posix()
+    notes = "" if notes_rel == "." else notes_rel + "/"
+    entries = []
+    for path in _markdown(root):
+        rel = path.relative_to(root).as_posix()
+        role, why = _classify(rel, cfg, decisions)
+        entry = Entry(
+            frm=rel, role=role, sha1=sha1_of(path),
+            bytes=path.stat().st_size, why=why,
+        )
+        entry.to = _destination(entry, cfg, notes)
+        entries.append(entry)
+    return entries
+
+
+def write_mapping(root: Path, entries: list[Entry], backup: BackupResult | None) -> Path:
+    root = Path(root).resolve()
+    target = root / MAPPING_RELATIVE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "generated": date.today().strftime("%Y-%m-%d"),
+        "backup": None if backup is None else {
+            "path": backup.path.name, "files": backup.files, "bytes": backup.bytes,
+        },
+        "gitSetup": {},
+        "files": [e.as_json() for e in entries],
+    }
+    target.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8", newline="\n",
+    )
+    return target
+
+
+def read_mapping(root: Path) -> dict:
+    target = Path(root).resolve() / MAPPING_RELATIVE
+    return json.loads(target.read_text(encoding="utf-8"))
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["backup"])
+    parser.add_argument("command", choices=["backup", "plan"])
     parser.add_argument("--root", type=Path, default=Path("."))
     args = parser.parse_args(argv)
+
+    if args.command == "plan":
+        entries = plan(args.root)
+        write_mapping(args.root, entries, None)
+        unknown = [e for e in entries if e.role == "?"]
+        for entry in entries:
+            arrow = entry.to or "제자리"
+            print(f"[{entry.role:>7}] {entry.frm} → {arrow}  ({entry.why})")
+        print(f"문서 {len(entries)}개 — 판단 필요 {len(unknown)}개")
+        return 0
 
     try:
         result = backup(args.root)
