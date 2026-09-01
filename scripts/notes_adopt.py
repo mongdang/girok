@@ -801,14 +801,201 @@ def broken_links(root: Path) -> list[tuple[str, str]]:
     return broken
 
 
+@dataclass
+class VerifyResult:
+    ok: bool = True
+    failures: list[str] = field(default_factory=list)
+
+    def fail(self, message: str) -> None:
+        self.ok = False
+        self.failures.append(message)
+
+
+def _write_mapping_payload(root: Path, payload: dict) -> None:
+    target = Path(root).resolve() / MAPPING_RELATIVE
+    target.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8", newline="\n",
+    )
+
+
+def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
+    """Back up, tidy git, move, merge, and repoint — in that order.
+
+    The order is the design. Checking preconditions after committing
+    everything would make the gate vacuous, and worse: in a repository that
+    already existed, sweeping *everything* into that commit drags in a
+    person's unrelated in-progress work. Backing up after `git init` would
+    capture a repository girok had already edited, and moving before the
+    preconditions would move a file the restore tag cannot bring back.
+    """
+    root = Path(root).resolve()
+    stamp = today or date.today().strftime("%Y%m%d")
+
+    mapping_path = root / MAPPING_RELATIVE
+    if not mapping_path.is_file():
+        write_mapping(root, plan(root), None)
+    mapping = read_mapping(root)
+
+    unresolved = [f["from"] for f in mapping["files"] if f["role"] == "?"]
+    if unresolved:
+        listed = ", ".join(unresolved[:5])
+        raise Blocked(
+            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 — {listed}. "
+            f"role 을 채운 뒤 다시 실행할 것"
+        )
+
+    if (root / ".git").exists():
+        check_preconditions(root, mapping)
+
+    saved = backup(root, today=stamp)
+    setup = git_setup(root)
+
+    if setup.init:
+        run_git(root, "add", "-A")
+        run_git(root, "commit", "-m", "chore: girok 이식 전 상태")
+    elif setup.gitignore_added:
+        # A pre-existing repository may hold unrelated, uncommitted work —
+        # `git add -A` here would sweep it into our commit. Only what we
+        # just wrote goes in.
+        run_git(root, "add", "--", ".gitignore")
+        run_git(root, "commit", "-m", "chore: girok 이식 전 상태")
+    run_git(root, "tag", f"girok-adopt-before-{stamp}")
+
+    cfg = notes_config.load(root)
+    for item in mapping["files"]:
+        target = item.get("to")
+        # The board's destination ("PROGRESS.md") is this methodology's own
+        # fixed name, not derived from whatever the person called it —
+        # there is nothing of theirs left in it to normalize.
+        if not target or item["role"] == "board":
+            continue
+        parent = Path(target).parent
+        name = normalize_name(Path(target).name, item["role"], cfg.adr_style)
+        item["to"] = (parent / name).as_posix() if parent.as_posix() != "." else name
+
+    destinations: dict[str, list[str]] = {}
+    for item in mapping["files"]:
+        if item.get("to"):
+            destinations.setdefault(item["to"], []).append(item["from"])
+    for dest, sources in destinations.items():
+        if len(sources) > 1:
+            raise Blocked(
+                f"{len(sources)}개 문서가 정규화 후 같은 자리로 겹친다 — "
+                f"{', '.join(sources)} 모두 `{dest}` 가 된다. 이름을 정리하고 "
+                f"다시 실행할 것 (자동으로 번호를 붙여 해결하지 않는다)"
+            )
+
+    for item in mapping["files"]:
+        if item.get("merge") and item["merge"] == item["from"]:
+            raise Blocked(
+                f"`{item['from']}` 를 자기 자신에 병합할 수 없다 — 내용을 이어붙인 뒤 "
+                f"원본을 지우면 문서가 그대로 사라진다"
+            )
+
+    broken_before = broken_links(root)
+
+    merges = [i for i in mapping["files"] if i.get("merge")]
+    plain = [i for i in mapping["files"] if not i.get("merge")]
+
+    moved = move_all(root, {"files": plain})
+    for item in merges:
+        merge_into(root, item["from"], item["merge"], today=None)
+        moved.append((item["from"], item["merge"]))
+
+    # `rewrite_links` only reports how many links changed, not which files —
+    # hash the markdown tree around the call to learn which paths it wrote,
+    # so the final commit can be scoped to exactly them.
+    before_hashes = {p: sha1_of(p) for p in _markdown(root)}
+    rewrite_links(root, moved)
+    rewritten = [
+        p for p in _markdown(root) if sha1_of(p) != before_hashes.get(p)
+    ]
+
+    mapping["gitSetup"] = {
+        "init": setup.init, "gitignoreAdded": setup.gitignore_added,
+        "secrets": setup.secrets, "large": setup.large,
+        "alreadyTracked": setup.already_tracked, "remote": setup.remote,
+    }
+    mapping["backup"] = {
+        "path": saved.path.name, "files": saved.files, "bytes": saved.bytes,
+    }
+    mapping["brokenBefore"] = [list(pair) for pair in broken_before]
+    _write_mapping_payload(root, mapping)
+
+    if setup.init:
+        # Nothing existed before girok touched this folder — there is no
+        # unrelated work to sweep in.
+        run_git(root, "add", "-A")
+    else:
+        touched = {MAPPING_RELATIVE.as_posix()}
+        touched.update(to for _, to in moved)
+        touched.update(p.relative_to(root).as_posix() for p in rewritten)
+        run_git(root, "add", "--", *sorted(touched))
+    run_git(root, "commit", "-m", "feat: girok 이식")
+
+    return moved
+
+
+def verify(root: Path) -> VerifyResult:
+    """Re-read the bytes and say whether the claims hold."""
+    root = Path(root).resolve()
+    result = VerifyResult()
+    try:
+        mapping = read_mapping(root)
+    except (OSError, ValueError):
+        result.fail("매핑 파일이 없다 — 무엇을 옮겼는지 알 수 없으므로 검증할 수 없다")
+        return result
+
+    for item in mapping["files"]:
+        landed = item.get("to") or item.get("merge") or item["from"]
+        path = root / landed
+        if not path.is_file():
+            result.fail(f"{landed} 가 없다 (원래 {item['from']})")
+            continue
+        if item.get("merge"):
+            continue
+        if item.get("to") and sha1_of(path) != item["sha1"]:
+            result.fail(f"{landed} 의 내용이 원본과 다르다")
+
+    saved = mapping.get("backup") or {}
+    if saved.get("path"):
+        backup_path = root.parent / saved["path"]
+        for item in mapping["files"]:
+            if not item.get("merge"):
+                continue
+            original = backup_path / item["from"]
+            merged = root / item["merge"]
+            if not (original.is_file() and merged.is_file()):
+                result.fail(f"{item['from']} 의 병합 결과를 대조할 수 없다")
+                continue
+            dropped = missing_lines(
+                original.read_text(encoding="utf-8", errors="replace"),
+                merged.read_text(encoding="utf-8", errors="replace"),
+            )
+            if dropped:
+                result.fail(
+                    f"{item['from']} 의 {len(dropped)}줄이 {item['merge']} 에 없다 — "
+                    f"첫 줄: {dropped[0][:40]}"
+                )
+
+    baseline = {tuple(pair) for pair in mapping.get("brokenBefore", [])}
+    for doc, link in broken_links(root):
+        if (doc, link) in baseline:
+            continue
+        result.fail(f"{doc} 의 링크가 깨졌다 — {link}")
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["backup", "plan"])
+    parser.add_argument("command", choices=["backup", "plan", "apply", "verify"])
     parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument("--confirm", default=None, help="이식할 저장소의 폴더 이름")
     args = parser.parse_args(argv)
 
     if args.command == "plan":
@@ -820,6 +1007,54 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[{entry.role:>7}] {entry.frm} → {arrow}  ({entry.why})")
         print(f"문서 {len(entries)}개 — 판단 필요 {len(unknown)}개")
         return 0
+
+    if args.command == "apply":
+        root = Path(args.root).resolve()
+        if args.confirm != root.name:
+            print(f"[중단] `{root}` 에서 아무것도 옮기지 않았다.")
+            print(f"  이식하려면 이름을 확인해 다시 실행할 것:  --confirm {root.name}")
+            return 1
+        try:
+            moved = apply(root)
+        except (BackupFailed, Blocked) as exc:
+            print(f"[중단] {exc}")
+            return 1
+        for frm, to in moved:
+            print(f"[이동] {frm} → {to}")
+
+        git_info = read_mapping(root).get("gitSetup", {})
+        already_tracked = git_info.get("alreadyTracked") or []
+        if already_tracked:
+            listed = ", ".join(already_tracked)
+            print(
+                "[주의] 다음 파일은 이미 git 에 커밋되어 있어 .gitignore 를 추가해도 빠지지\n"
+                "않는다 — 이력을 지우려면 이력을 다시 써야 하는데 이 방법론은 그것을\n"
+                "금지한다. 비밀이 들어 있다면 값을 폐기·교체하는 것이 답이다: " + listed
+            )
+
+        print(f"{len(moved)}개 이동. 이어서 `verify` 를 돌릴 것")
+
+        if git_info.get("remote") is None:
+            print(
+                "원격 저장소가 없다 — `git remote add origin <주소>` 뒤 "
+                "`git push -u origin <브랜치> --tags` 로 커밋과 복원 태그를 함께 올릴 것"
+            )
+        else:
+            print("push 할 때는 태그도 함께 올릴 것 — `git push --tags`")
+        return 0
+
+    if args.command == "verify":
+        result = verify(args.root)
+        for failure in result.failures:
+            print(f"[실패] {failure}")
+        if result.ok:
+            print("이식 검증 통과 — 유실 없음")
+            return 0
+        stamp = date.today().strftime("%Y%m%d")
+        print("복원하려면:")
+        print(f"  git checkout girok-adopt-before-{stamp} -- .")
+        print("  또는 백업 폴더에서 통째로 되돌릴 것")
+        return 1
 
     try:
         result = backup(args.root)
