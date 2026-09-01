@@ -523,6 +523,47 @@ def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
     return moved
 
 
+def missing_lines(original: str, result: str) -> list[str]:
+    """Lines of `original` that do not appear in `result`.
+
+    This is the whole argument for appending rather than rewriting: a
+    rewrite cannot be checked this way, so a dropped sentence is invisible.
+    Blank lines carry nothing and are ignored.
+    """
+    present = {line.strip() for line in result.splitlines()}
+    return [
+        line.strip() for line in original.splitlines()
+        if line.strip() and line.strip() not in present
+    ]
+
+
+def merge_into(root: Path, source: str, target: str, today: str | None = None) -> None:
+    """Append `source` to `target` verbatim, then drop `source`.
+
+    Not a word is changed. Summarizing or reflowing here would be nicer to
+    read and impossible to verify, and "nothing is lost" was the whole
+    requirement.
+    """
+    root = Path(root).resolve()
+    src, dst = root / source, root / target
+    stamp = today or date.today().strftime("%Y-%m-%d")
+
+    body = src.read_text(encoding="utf-8")
+    head = dst.read_text(encoding="utf-8") if dst.is_file() else ""
+    if head and not head.endswith("\n"):
+        head += "\n"
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(
+        f"{head}\n<!-- girok:adopt {stamp} · 출처 {source} -->\n{body}",
+        encoding="utf-8", newline="\n",
+    )
+
+    result = run_git(root, "rm", "-q", "--", source)
+    if result.returncode != 0:
+        src.unlink(missing_ok=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
