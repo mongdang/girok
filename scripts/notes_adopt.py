@@ -1358,11 +1358,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=["backup", "plan", "apply", "verify"])
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--confirm", default=None, help="이식할 저장소의 폴더 이름")
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="plan: 표만 출력하고 매핑 파일은 건드리지 않는다",
+    )
     args = parser.parse_args(argv)
 
     if args.command == "plan":
         entries = plan(args.root)
-        write_mapping(args.root, entries, None)
+        if not args.dry_run:
+            # A routine check must not rewrite the mapping: the `?`
+            # resolutions in it were filled in by hand, and in an already
+            # adopted repository it is the committed record of what moved.
+            write_mapping(args.root, entries, None)
         unknown = [e for e in entries if e.role == "?"]
         for entry in entries:
             arrow = entry.to or "제자리"
@@ -1378,17 +1386,23 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         try:
             moved = apply(root)
-        except (BackupFailed, Blocked) as exc:
-            print(f"[중단] {exc}")
+        except Exception as exc:
+            # Every failure lands here, not just the recognized ones. A full
+            # disk, a permission error, a file this cannot read: the person
+            # still has files half-moved and a safety net they need to be
+            # told about, and a traceback tells them neither.
+            if isinstance(exc, (BackupFailed, Blocked)):
+                print(f"[중단] {exc}")
+            else:
+                print(f"[중단] 예상치 못한 오류 — {type(exc).__name__}: {exc}")
             tag = getattr(exc, "tag", None)
             backup_name = getattr(exc, "backup_name", None)
             if tag and backup_name:
                 # A backup and restore tag were already made before this
                 # failed — some files may already be staged as moved.
                 print("git mv/git rm 으로 스테이징된 이동이 인덱스에 남아 있을 수 있다.")
-                print("복원하려면:")
-                print(f"  git checkout {tag} -- .")
-                print(f"  또는 백업 폴더 {backup_name} 에서 통째로 되돌릴 것")
+                for line in restore_guidance(tag, backup_name):
+                    print(line)
             return 1
         for frm, to in moved:
             print(f"[이동] {frm} → {to}")
@@ -1402,6 +1416,19 @@ def main(argv: list[str] | None = None) -> int:
                 "않는다 — 이력을 지우려면 이력을 다시 써야 하는데 이 방법론은 그것을\n"
                 "금지한다. 비밀이 들어 있다면 값을 폐기·교체하는 것이 답이다: " + listed
             )
+
+        excluded = (git_info.get("secrets") or []) + (git_info.get("large") or [])
+        if excluded:
+            print(
+                "[주의] 다음 파일을 비밀 또는 대용량으로 판단해 .gitignore 에 넣었다 — "
+                "git 밖에 남으므로\n백업 폴더에만 존재한다. 필요한 파일이면 지금 "
+                "확인할 것: " + ", ".join(excluded)
+            )
+
+        updated = read_mapping(root).get("configUpdated") or {}
+        if updated:
+            listed = ", ".join(f"{k} → {v}" for k, v in updated.items())
+            print(f"[설정] 문서가 옮겨간 자리에 맞춰 girok.json 을 고쳤다: {listed}")
 
         print(f"{len(moved)}개 이동. 이어서 `verify` 를 돌릴 것")
 
@@ -1421,10 +1448,8 @@ def main(argv: list[str] | None = None) -> int:
         if result.ok:
             print("이식 검증 통과 — 유실 없음")
             return 0
-        stamp = date.today().strftime("%Y%m%d")
-        print("복원하려면:")
-        print(f"  git checkout girok-adopt-before-{stamp} -- .")
-        print("  또는 백업 폴더에서 통째로 되돌릴 것")
+        for line in restore_guidance(result.tag, result.backup):
+            print(line)
         return 1
 
     try:
