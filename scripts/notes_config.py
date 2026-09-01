@@ -142,6 +142,38 @@ def _is_repository(root: Path) -> bool:
     return _config_path(root) is not None or (root / ".git").exists()
 
 
+# Files that mark a folder as a project in its own right. Used only to
+# recognize a *parent* of several projects — never to require one, because a
+# records repository has no manifest and rejecting those was the bug this
+# replaced.
+MANIFESTS = (
+    "pyproject.toml", "package.json", "go.mod", "Cargo.toml",
+    "pom.xml", "build.gradle", "Gemfile", "composer.json",
+)
+
+# Folders that hold other people's checkouts rather than parts of this one.
+_NOT_A_SIBLING = {".git", "node_modules", ".venv", "vendor", "packages", "third_party"}
+
+
+def is_workspace(root: Path) -> bool:
+    """A directory that merely *contains* projects, rather than being one.
+
+    `git init` here would swallow every repository underneath into a single
+    one, which is worse to undo than anything else adoption does. Two
+    children that each look like a project is the signal; one is not, since
+    a vendored dependency is an ordinary thing to find inside a project.
+    """
+    if not root.is_dir():
+        return False
+    projects = 0
+    for child in sorted(p for p in root.iterdir() if p.is_dir()):
+        if child.name in _NOT_A_SIBLING or child.name.startswith("."):
+            continue
+        if (child / ".git").exists() or any((child / m).is_file() for m in MANIFESTS):
+            projects += 1
+    return projects >= 2
+
+
 def _guess_notes_dir(repo_root: Path) -> Path:
     """No config: find the folder holding `docs/`.
 
