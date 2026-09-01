@@ -405,6 +405,12 @@ def _porcelain(root: Path) -> dict[str, str]:
 
     `-c core.quotepath=false` keeps a Korean (or any non-ASCII) path
     readable instead of C-escaped, so it still matches a mapping entry.
+
+    A rename (`R  old -> new`) records under both names: someone may have
+    run `git mv` by hand before this ever looks, and the mapping's `from`
+    still names the old path — only recording the new one would let that
+    file slip past the gate and die later, inside `move_all`, on a git
+    error nobody can read.
     """
     result = run_git(root, "-c", "core.quotepath=false", "status", "--porcelain")
     states = {}
@@ -413,7 +419,8 @@ def _porcelain(root: Path) -> dict[str, str]:
             continue
         code, rel = line[:2], line[3:].strip().strip('"')
         if " -> " in rel:
-            rel = rel.split(" -> ", 1)[1]
+            old, rel = rel.split(" -> ", 1)
+            states[old] = code
         states[rel] = code
     return states
 
@@ -486,9 +493,10 @@ def normalize_name(name: str, role: str, adr_style: str) -> str:
 def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
     """Move every planned document with `git mv`, so history follows.
 
-    `git mv` only stages a rename — `git log --follow` walks committed
-    history, so a rename nobody committed yet is invisible to it. Committing
-    here is what makes "history follows" true rather than merely intended.
+    This only stages the renames. The move alone leaves links between
+    documents broken — merging and link rewriting still have to happen —
+    so committing here would bury that half-finished state in history
+    permanently. `apply` commits once, after everything is done.
     """
     root = Path(root).resolve()
     moved = []
@@ -504,8 +512,6 @@ def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
                 f"`{item['from']}` 를 옮기지 못했다 — {result.stderr.strip()}"
             )
         moved.append((item["from"], target))
-    if moved:
-        run_git(root, "commit", "-m", "girok notes-adopt: 문서 위치 이동")
     return moved
 
 

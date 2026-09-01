@@ -99,8 +99,25 @@ def test_moving_uses_git_so_history_follows(repo):
 
     assert (repo / "PROGRESS.md").is_file()
     assert not (repo / "STATE.md").exists()
+    # move_all only stages the rename — apply commits once, after everything
+    # is done — so the test commits here to check what the staged rename
+    # will look like in history once that happens.
+    notes_adopt.run_git(repo, "commit", "-m", "move")
     log = notes_adopt.run_git(repo, "log", "--follow", "--name-only", "--", "PROGRESS.md")
     assert "STATE.md" in log.stdout
+
+
+def test_an_already_staged_rename_still_blocks_by_its_old_name(repo):
+    notes_adopt.run_git(repo, "mv", "STATE.md", "PROGRESS.md")
+    mapping = _mapping([
+        {"from": "STATE.md", "to": "PROGRESS.md", "role": "board", "merge": None,
+         "sha1": "x", "bytes": 1, "why": ""},
+    ])
+
+    with pytest.raises(notes_adopt.Blocked) as excinfo:
+        notes_adopt.check_preconditions(repo, mapping)
+
+    assert "STATE.md" in str(excinfo.value)
 
 
 def test_content_survives_the_move(repo):
