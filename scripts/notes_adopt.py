@@ -561,6 +561,17 @@ def merge_into(root: Path, source: str, target: str, today: str | None = None) -
 
     result = run_git(root, "rm", "-q", "--", source)
     if result.returncode != 0:
+        if source in _tracked_files(root):
+            # git knows this file and refused to drop it (lock, permission,
+            # a broken .git) — its content is already appended into `target`,
+            # so deleting it now would desync the index from the working
+            # tree. Stop and let a person sort out git's state.
+            raise Blocked(
+                f"`{source}` 를 git에서 지우지 못했다 — {result.stderr.strip()}\n"
+                f"내용은 이미 `{target}` 에 이어붙었으니, `{source}` 상태를 확인한 뒤 직접 정리할 것"
+            )
+        # Never tracked, so git has nothing to lose track of — its content
+        # is already in `target`, so a plain filesystem delete is safe.
         src.unlink(missing_ok=True)
 
 

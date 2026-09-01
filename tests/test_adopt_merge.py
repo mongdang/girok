@@ -5,6 +5,8 @@ Appending reads worse and can: every line of the original is either present
 in the result or it is not, and that is a test. Tidying is a later,
 reversible job for a person.
 """
+import subprocess
+
 import notes_adopt
 import pytest
 
@@ -71,3 +73,35 @@ def test_missing_lines_reports_what_was_dropped():
 
 def test_missing_lines_ignores_blank_lines():
     assert notes_adopt.missing_lines("가\n\n\n나\n", "가\n나\n") == []
+
+
+def test_untracked_source_falls_back_to_plain_delete(repo):
+    # Never `git add`-ed, so `git rm` cannot find it in the index — this is
+    # the normal, harmless reason `git rm` fails.
+    write(repo / "DRAFT.md", "# 초안\n\n버려질 예정\n")
+
+    notes_adopt.merge_into(repo, "DRAFT.md", "PROGRESS.md", today="2026-09-01")
+
+    assert not (repo / "DRAFT.md").exists()
+    result = (repo / "PROGRESS.md").read_text(encoding="utf-8")
+    assert "버려질 예정" in result
+
+
+def test_tracked_source_blocks_instead_of_silently_deleting(repo, monkeypatch):
+    # A tracked source whose `git rm` fails for some other reason (a lock,
+    # a permission error, a broken .git) must not be deleted out from under
+    # git's index — that would leave the working tree and the index
+    # disagreeing about whether the file exists.
+    real_run_git = notes_adopt.run_git
+
+    def failing_rm(root, *args):
+        if args and args[0] == "rm":
+            return subprocess.CompletedProcess(args, 1, stdout="", stderr="fatal: unable to lock")
+        return real_run_git(root, *args)
+
+    monkeypatch.setattr(notes_adopt, "run_git", failing_rm)
+
+    with pytest.raises(notes_adopt.Blocked):
+        notes_adopt.merge_into(repo, "STATE.md", "PROGRESS.md", today="2026-09-01")
+
+    assert (repo / "STATE.md").exists()
