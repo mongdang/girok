@@ -26,7 +26,17 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/method_sync.py" status
 
 ### 2. 초기화 — 스냅샷이 없을 때
 
-**먼저 저장소를 읽는다.** 기본값으로 뼈대를 뿌리기 전에, 이 저장소가 이미 어떤 관례를
+**먼저 백업한다.** 이 저장소에 아무것도 쓰기 전에 원본을 통째로 남긴다. `git init` 도,
+뼈대 생성도 이 뒤다 — 순서가 바뀌면 백업이 담는 것은 girok 이 이미 손댄 상태다.
+
+```
+python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py backup
+```
+
+워크스페이스(저장소를 여러 개 담은 상위 폴더)로 보이면 여기서 멈춘다. 그때는 작업할
+저장소 폴더로 옮겨 다시 켤 것.
+
+**그리고 저장소를 읽는다.** 기본값으로 뼈대를 뿌리기 전에, 이 저장소가 이미 어떤 관례를
 쓰고 있는지 조사한다 — 안 하면 진짜 문서 옆에 빈 문서 한 벌이 더 생긴다.
 
 ```
@@ -72,6 +82,57 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_init.py" --confirm <저장소 폴더
 > 팀원이 명령 없이 플러그인을 받는다. 다만 **각자 폴더 신뢰를 승인하기 전까지는
 > 플러그인이 조용히 오지 않는다** — 그래서 `CLAUDE.md` 상단 게이트 블록이 필요하다.
 
+### 2-1. 이식 — 기존 기록을 girok 자리로
+
+뼈대만 만들고 끝내면 진짜 문서 옆에 빈 문서 한 벌이 남는다. 기존 기록을 옮긴다.
+
+```
+python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py plan
+```
+
+읽기 전용이다. `.claude/girok-adopt.json` 에 전수 목록과 `role` 초안이 생긴다.
+
+**`role` 이 `?` 인 항목은 규칙이 판단하지 못한 것이다. 그 문서를 직접 읽고 채운다** —
+`to`(어디로) 와, 다른 문서에 합쳐야 하면 `merge`(어느 문서에) 를 적는다. 채운 결과를
+표로 사용자에게 보여주고 승인을 받는다. `?` 가 하나라도 남으면 다음 단계가 거부한다 —
+그리고 매핑 파일 자체가 없으면 `apply` 는 스스로 만들지 않고 곧바로 거부한다. 순서는
+반드시 `plan` → 사람이 `?` 를 채움 → `apply` 다.
+
+```
+python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py apply --confirm <저장소 폴더 이름>
+python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py verify
+```
+
+`apply` 는 이식 전체를 커밋 하나로 묶고 `girok-adopt-before-<날짜>` 태그를 남긴다.
+`git push` 는 태그를 함께 올리지 않으니 **`git push --tags` 로 따로 올릴 것** — 원격이
+아직 없으면 `git remote add origin <주소>` 뒤 `git push -u origin <브랜치> --tags` 로
+커밋과 태그를 함께 올린다.
+
+이동 중 어디서든 막히면(이름 충돌, 자기 자신 병합 등) **그 시점에 이미 백업과 복원
+태그는 만들어져 있다** — 안내가 실제 태그 이름과 백업 폴더 이름을 그대로 찍어준다.
+`verify` 가 실패해도 마찬가지로 그 자리에서 복원 방법을 안내하고 멈춘다. 스스로 고치려
+들지 않는다 — 무엇이 어긋났는지 모르는 채로 손대면 백업이 유일한 사실이 된다.
+
+> [!CAUTION]
+> 병합은 **이어붙이기만** 한다. 원문을 요약하거나 다시 쓰지 않는다. 다듬는 것은
+> `verify` 가 통과한 다음 세션에 사람이 볼 때 할 일이다.
+
+> [!NOTE]
+> `verify` 가 증명하는 것은 정해져 있다. 단순 이동 문서는 바이트 단위(sha1)로 원본과
+> 같은지 본다. 병합 문서는 원본의 모든 줄이 결과 안에 (공백 제외하고) 들어있는지만
+> 본다 — 줄 순서가 바뀌거나 같은 줄이 중복돼도 통과한다. 매핑에 오르지 않은 문서(마크
+> 다운이 아니거나 애초에 분류에서 빠진 것)는 검사 범위 밖이다.
+
+이식 과정에서 비밀·대용량 파일이 이미 git 에 커밋돼 있으면 `.gitignore` 를 추가해도
+그 파일은 이력에서 빠지지 않는다는 안내가 뜬다. **이력을 다시 쓰지 않는다** — 비밀이면
+값을 폐기하고 새로 발급하는 것이 답이다.
+
+`notesDir` 가 `"."` 인 저장소(문서가 루트에 흩어져 있는 경우)라면 **한 번 물어볼 값이
+있다** — 문서를 `notes/` 아래로 모을 것인지. 이식은 기본적으로 현행 `notesDir` 를
+유지한다. 바꾸면 모든 문서 경로가 달라져 링크 재작성량이 몇 배가 되고, `notesDir: "."`
+는 girok 이 허용하는 정식 값이라 안 바꿔도 표준 위반이 아니다. **사람이 명시적으로
+원할 때만** `.claude/girok.json` 의 `notesDir` 를 먼저 고치고 `plan` 을 다시 돌린다.
+
 ### 3. sync — 스냅샷이 낡았을 때
 
 무엇이 바뀌는지 먼저 보여주고 진행한다.
@@ -93,6 +154,7 @@ MAJOR 버전이 올랐으면 `migrations/` 에 해당 문서가 있는지 확인
 python "${CLAUDE_PLUGIN_ROOT}/scripts/method_sync.py" verify
 python "${CLAUDE_PLUGIN_ROOT}/scripts/check_docs.py"
 python "${CLAUDE_PLUGIN_ROOT}/scripts/marker_scan.py"
+python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py plan
 ```
 
 그리고 현황을 한 문단으로 보고한다:
@@ -101,6 +163,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/marker_scan.py"
 - 미push 커밋 (`git status -sb`)
 - 상대 작업자의 새 내용 (`git fetch <remote>` 후 브랜치·스탬프 비교)
 - 검사기·마커 스캔 실패 항목
+- 이식 안 된 문서 (`role` 이 `?` 이거나 제자리가 아닌 항목 수)
 
 ## 하지 않는 것
 
@@ -108,3 +171,5 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/marker_scan.py"
 - **병합을 자동으로 하지 않는다.** 반입 내용이 있으면 요약을 제시하고 승인을 받는다.
 - **`.method/` 를 손으로 고치지 않는다.** 개정은 플러그인 원본에서 한다.
 - **force push 를 제안하지 않는다.**
+- **백업 없이 파일을 옮기지 않는다.** `backup` 이 실패하면 거기서 멈춘다.
+- **병합할 때 원문을 고쳐 쓰지 않는다.** 이어붙이고 출처를 남긴다.

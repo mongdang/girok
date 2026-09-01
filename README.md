@@ -228,6 +228,7 @@ flowchart LR
 <tr><td><code>marker_scan.py</code></td><td>게이트에 등재되지 않은 <code>SAFETY-STUB</code> · <code>VIRTUAL-BYPASS</code></td></tr>
 <tr><td><code>method_sync.py</code></td><td><code>.method/</code> 스냅샷 생성과 무결성 검증</td></tr>
 <tr><td><code>notes_survey.py</code></td><td>도입 전 저장소 조사 — 기존 관례에서 설정을 추론하고 정리할 것을 보고한다 (읽기 전용)</td></tr>
+<tr><td><code>notes_adopt.py</code></td><td>기존 기록을 girok 자리로 이식 — <code>backup</code>·<code>plan</code>·<code>apply</code>·<code>verify</code> 순으로 백업·목록화·이동·검증한다</td></tr>
 </table>
 
 검사기는 **커밋된 스냅샷에서** 돌기 때문에 CI에 아무것도 설치할 필요가 없다.
