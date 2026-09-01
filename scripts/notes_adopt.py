@@ -311,6 +311,26 @@ def write_mapping(root: Path, entries: list[Entry], backup: BackupResult | None)
     return target
 
 
+def hand_filled(existing: dict, entries: list[Entry]) -> list[str]:
+    """Paths in `existing` whose hand-written answer a replan would drop.
+
+    `plan` reads the repository, not the mapping: every entry it returns is
+    built from scratch, so writing them over an existing mapping throws away
+    the `role` a person resolved, every `merge` they wrote, and every
+    `keep`. Those are the three things no rule can reproduce.
+    """
+    proposed = {entry.frm: entry.role for entry in entries}
+    lost = []
+    for item in existing.get("files", []):
+        frm = item.get("from")
+        role = item.get("role")
+        if item.get("merge") or role == "keep":
+            lost.append(frm)
+        elif role not in (None, "?") and proposed.get(frm) == "?":
+            lost.append(frm)
+    return lost
+
+
 def read_mapping(root: Path) -> dict:
     target = Path(root).resolve() / MAPPING_RELATIVE
     return json.loads(target.read_text(encoding="utf-8"))
@@ -522,13 +542,20 @@ def check_preconditions(root: Path, mapping: dict) -> None:
         )
 
     states = _porcelain(root)
+    # A merge target is about to be appended to and its source deleted, so
+    # the restore tag has to hold it — even when the target itself never
+    # moves and so carries no `to` of its own.
+    targets = {f["merge"] for f in mapping["files"] if f.get("merge")}
     dirty = []
     for item in mapping["files"]:
         # Only what adoption is about to touch. A half-finished edit to
         # `CLAUDE.md`, which never moves, is ordinary work — blocking on it
         # would make the gate about tidiness instead of about what the
         # restore tag can bring back (spec §4: "이식 대상 밖은 통과").
-        if not item.get("to") and not item.get("merge"):
+        if (
+            not item.get("to") and not item.get("merge")
+            and item["from"] not in targets
+        ):
             continue
         code = states.get(item["from"])
         if code is None:
@@ -1050,11 +1077,17 @@ def update_config(root: Path, mapping: dict) -> dict:
 
     docs = notes_config.DEFAULT_DOC_ROOTS[0]
     roots = list(raw.get("docRoots") or [])
+    # `docs` has to be *first*, not merely present: `cfg.docs_dir` is
+    # `doc_roots_relative[0]`, and that is where the gate hook, the linter
+    # and the marker scan open `SAFETY_GATE.md` by name. A config listing
+    # `["documents", "docs"]` left them reading `documents/SAFETY_GATE.md`
+    # after the gate had moved to `docs/` — no gate, nothing OPEN, real
+    # motion commands through, and `verify` passing.
     if (
         any(t.startswith(f"{notes}{docs}/") for t in landed)
-        and roots and docs not in roots
+        and roots and roots[0] != docs
     ):
-        raw["docRoots"] = [docs, *roots]
+        raw["docRoots"] = [docs, *(r for r in roots if r != docs)]
         changed["docRoots"] = raw["docRoots"]
 
     if changed:
@@ -1190,8 +1223,17 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
 
         config_updated = update_config(root, mapping)
     except Exception as exc:
-        exc.tag = tag
-        exc.backup_name = saved.path.name
+        try:
+            exc.tag = tag
+            exc.backup_name = saved.path.name
+        except AttributeError:
+            # An exception type that refuses attributes must not turn into
+            # the failure that gets reported — the original error and the
+            # safety net are what the person needs. `Blocked` carries both.
+            blocked = Blocked(f"이식 중 오류가 났다 — {type(exc).__name__}: {exc}")
+            blocked.tag = tag
+            blocked.backup_name = saved.path.name
+            raise blocked from exc
         raise
 
     mapping["gitSetup"] = {
@@ -1269,8 +1311,14 @@ def verify(root: Path) -> VerifyResult:
                 f"백업의 {item['from']} 가 없어 나머지 내용이 그대로인지 대조할 수 없다"
             )
             continue
-        before = link_skeleton(_read_document(original, backup_path))
-        now = link_skeleton(_read_document(path, root))
+        try:
+            before = link_skeleton(_read_document(original, backup_path))
+            now = link_skeleton(_read_document(path, root))
+        except Blocked as exc:
+            # A comparison that could not be read is not a comparison that
+            # passed.
+            result.fail(str(exc))
+            continue
         if landed in merge_targets:
             # Another document was appended into this one, so it is longer
             # than the original by design. Every original line still has to
@@ -1362,6 +1410,10 @@ def main(argv: list[str] | None = None) -> int:
         "--dry-run", action="store_true",
         help="plan: 표만 출력하고 매핑 파일은 건드리지 않는다",
     )
+    parser.add_argument(
+        "--reset-mapping", action="store_true",
+        help="plan: 손으로 채운 값을 버리고 매핑을 처음부터 다시 만든다",
+    )
     args = parser.parse_args(argv)
 
     if args.command == "plan":
@@ -1370,6 +1422,22 @@ def main(argv: list[str] | None = None) -> int:
             # A routine check must not rewrite the mapping: the `?`
             # resolutions in it were filled in by hand, and in an already
             # adopted repository it is the committed record of what moved.
+            try:
+                existing = read_mapping(args.root)
+            except (OSError, ValueError):
+                existing = {}
+            lost = hand_filled(existing, entries)
+            if lost and not args.reset_mapping:
+                listed = ", ".join(lost[:5])
+                print(
+                    f"[중단] 매핑을 다시 쓰지 않았다 — 사람이 손으로 채운 항목이 "
+                    f"{len(lost)}개 있고, `plan` 은 저장소만 보고 매핑을 통째로 다시 "
+                    f"만들기 때문에 그 답이 사라진다: {listed}"
+                )
+                print("  해소한 `role`·손으로 쓴 `merge`·`keep` 이 사라진다.")
+                print("  표만 보려면:            plan --dry-run")
+                print("  정말 처음부터 다시 하려면: plan --reset-mapping")
+                return 1
             write_mapping(args.root, entries, None)
         unknown = [e for e in entries if e.role == "?"]
         for entry in entries:

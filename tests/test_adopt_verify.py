@@ -330,3 +330,17 @@ def test_an_undecodable_document_is_named_not_a_traceback(adopted, capsys):
     out = capsys.readouterr().out
     assert "옛문서.md" in out
     assert "-girok-backup-20" in out, "이미 만들어진 백업을 알려야 한다"
+
+
+def test_an_unreadable_backup_copy_fails_verification_without_a_traceback(adopted):
+    # The skeleton comparison reads the backup's original. If that copy
+    # cannot be decoded, the verification did not finish — which is a
+    # failure, never a traceback out of `verify()`.
+    notes_adopt.apply(adopted, today="20260901")
+    backup = adopted.parent / f"{adopted.name}-girok-backup-20260901"
+    (backup / "STATE.md").write_bytes("# 현황\n돌아간다\n".encode("cp949"))
+
+    result = notes_adopt.verify(adopted)
+
+    assert not result.ok
+    assert any("STATE.md" in f for f in result.failures)

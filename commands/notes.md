@@ -99,8 +99,14 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 | 채울 것 | 규칙 |
 |---|---|
 | `role` | `board`·`adr`·`doc` 중 하나. 옮기지 않기로 했으면 `keep` |
-| `to` | 옮길 자리. `role` 을 고치고 `plan` 을 다시 돌리면 규칙이 채워준다 |
+| `to` | 옮길 자리. **손으로 적는다** |
 | `merge` | 다른 문서에 합칠 때만. **`merge` 를 적으면 `to` 는 `null` 로 둔다** |
+
+> [!WARNING]
+> **`plan` 을 다시 돌리면 채운 것이 사라진다.** `plan` 은 매핑을 읽지 않고 저장소만
+> 보고 목록을 통째로 다시 만든다 — 해소한 `role`, 손으로 쓴 `merge`, `keep` 이 전부
+> 날아간다. 그래서 손으로 채운 값이 있으면 `plan` 은 덮어쓰지 않고 거부한다. 표만
+> 다시 보려면 `plan --dry-run`, 정말 처음부터 다시 하려면 `plan --reset-mapping` 이다.
 
 `merge` 의 값은 **이동 후 경로**로 적는다. 병합은 이동이 끝난 뒤에 일어나므로, 표에서
 읽은 현재 이름(`STATE.md`)을 적으면 그 문서는 이미 `PROGRESS.md` 로 가 있다 — 대상이
