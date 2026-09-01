@@ -17,7 +17,7 @@ def test_a_relative_link_follows_the_move(tmp_path):
         root, [("decisions/001-first.md", "docs/decisions/ADR-001-first.md")]
     )
 
-    assert changed == 1
+    assert changed == ["PROGRESS.md"]
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert "(docs/decisions/ADR-001-first.md)" in text
 
@@ -64,7 +64,7 @@ def test_a_path_inside_a_code_block_is_left_alone(tmp_path):
         root, [("decisions/001-first.md", "docs/decisions/ADR-001-first.md")]
     )
 
-    assert changed == 0
+    assert changed == []
     assert "cat decisions/001-first.md" in (root / "PROGRESS.md").read_text(encoding="utf-8")
 
 
@@ -76,7 +76,7 @@ def test_an_external_url_is_left_alone(tmp_path):
         root, [("decisions/001-first.md", "docs/decisions/ADR-001-first.md")]
     )
 
-    assert changed == 0
+    assert changed == []
 
 
 def test_broken_links_are_reported(tmp_path):
@@ -100,7 +100,7 @@ def test_a_destination_with_a_space_follows_the_move(tmp_path):
 
     changed = notes_adopt.rewrite_links(root, [("my file.md", "docs/my file.md")])
 
-    assert changed == 1
+    assert changed == ["PROGRESS.md"]
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert "(docs/my file.md)" in text
 
@@ -139,7 +139,7 @@ def test_an_html_image_src_follows_the_move(tmp_path):
 
     changed = notes_adopt.rewrite_links(root, [("old/그림.png", "docs/그림.png")])
 
-    assert changed == 1
+    assert changed == ["PROGRESS.md"]
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert 'src="docs/그림.png"' in text
 
@@ -150,7 +150,7 @@ def test_an_html_link_href_with_single_quotes_follows_the_move(tmp_path):
 
     changed = notes_adopt.rewrite_links(root, [("old/문서.md", "docs/문서.md")])
 
-    assert changed == 1
+    assert changed == ["PROGRESS.md"]
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert "href='docs/문서.md'" in text
 
@@ -161,7 +161,7 @@ def test_html_inside_a_code_block_is_left_alone(tmp_path):
 
     changed = notes_adopt.rewrite_links(root, [("old/그림.png", "docs/그림.png")])
 
-    assert changed == 0
+    assert changed == []
     assert '<img src="old/그림.png">' in (root / "PROGRESS.md").read_text(encoding="utf-8")
 
 
@@ -171,7 +171,7 @@ def test_a_percent_encoded_destination_follows_the_move(tmp_path):
 
     changed = notes_adopt.rewrite_links(root, [("my file.md", "docs/my file.md")])
 
-    assert changed == 1
+    assert changed == ["PROGRESS.md"]
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert "(docs/my file.md)" in text
 
@@ -198,7 +198,7 @@ def test_a_link_after_an_unclosed_fence_is_left_alone(tmp_path):
         root, [("decisions/001-first.md", "docs/decisions/ADR-001-first.md")]
     )
 
-    assert changed == 1
+    assert changed == ["PROGRESS.md"]
     text = (root / "PROGRESS.md").read_text(encoding="utf-8")
     assert "[전](docs/decisions/ADR-001-first.md)" in text
     assert "[후](decisions/001-first.md)" in text

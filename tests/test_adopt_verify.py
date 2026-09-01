@@ -25,6 +25,10 @@ def adopted(tmp_path):
     notes_adopt.run_git(root, "config", "user.name", "t")
     notes_adopt.run_git(root, "add", "-A")
     notes_adopt.run_git(root, "commit", "-m", "init")
+    # `apply` refuses to run without a plan already on disk — the person
+    # (or model) is meant to see the proposal and resolve any `?` before
+    # anything moves. Every test here stands in for that step.
+    notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
     return root
 
 
@@ -110,6 +114,7 @@ def test_destination_collisions_are_blocked_not_auto_resolved(tmp_path):
     notes_adopt.run_git(root, "config", "user.name", "t")
     notes_adopt.run_git(root, "add", "-A")
     notes_adopt.run_git(root, "commit", "-m", "init")
+    notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
 
     with pytest.raises(notes_adopt.Blocked) as excinfo:
         notes_adopt.apply(root, today="20260901")
@@ -141,10 +146,7 @@ def test_verify_still_catches_newly_broken_links(adopted):
 
 
 def test_merging_a_document_into_itself_is_blocked(adopted):
-    mapping = notes_adopt.read_mapping(adopted) if (adopted / notes_adopt.MAPPING_RELATIVE).is_file() else None
-    if mapping is None:
-        notes_adopt.write_mapping(adopted, notes_adopt.plan(adopted), None)
-        mapping = notes_adopt.read_mapping(adopted)
+    mapping = notes_adopt.read_mapping(adopted)
     for item in mapping["files"]:
         if item["from"] == "decisions/001-first.md":
             item["merge"] = item["from"]
@@ -154,3 +156,24 @@ def test_merging_a_document_into_itself_is_blocked(adopted):
         notes_adopt.apply(adopted, today="20260901")
 
     assert "decisions/001-first.md" in str(excinfo.value)
+
+
+def test_apply_without_a_plan_is_blocked_and_touches_nothing(tmp_path):
+    # `plan` is the approval gate — a person (or model) sees the proposal
+    # and resolves every `?` before anything is allowed to move. `apply`
+    # must not silently generate one behind that gate.
+    root = tmp_path / "proj"
+    write(root / "STATE.md", "# 현황\n")
+    notes_adopt.run_git(root, "init")
+    notes_adopt.run_git(root, "config", "user.email", "t@example.invalid")
+    notes_adopt.run_git(root, "config", "user.name", "t")
+    notes_adopt.run_git(root, "add", "-A")
+    notes_adopt.run_git(root, "commit", "-m", "init")
+
+    with pytest.raises(notes_adopt.Blocked):
+        notes_adopt.apply(root, today="20260901")
+
+    assert not (root / ".claude" / "girok-adopt.json").exists()
+    assert not (root.parent / f"{root.name}-girok-backup-20260901").exists()
+    tags = notes_adopt.run_git(root, "tag").stdout
+    assert "girok-adopt-before-20260901" not in tags

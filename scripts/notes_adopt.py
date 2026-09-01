@@ -736,17 +736,24 @@ def _rewrite_html_attrs(line: str, doc_rel: str, moves: dict[str, str]) -> tuple
     return HTML_ATTR.sub(swap, line), changed
 
 
-def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
-    """Point every relative link at where its document went."""
+def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> list[str]:
+    """Point every relative link at where its document went.
+
+    Returns the repository-root-relative paths of documents this actually
+    wrote, sorted. The caller (`apply`) needs exactly this list to scope its
+    final commit, and this function already knows it — recomputing it from
+    outside by re-hashing the tree would be the same answer, done twice.
+    """
     root = Path(root).resolve()
     table = dict(moves)
-    changed = 0
+    touched = []
 
     for path in _markdown(root):
         doc_rel = path.relative_to(root).as_posix()
         # A document that itself moved is already at its new path.
         original = path.read_text(encoding="utf-8")
         lines = []
+        changed = 0
         for line, is_code in _outside_code(original):
             if is_code:
                 lines.append(line)
@@ -771,7 +778,8 @@ def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
         updated = "\n".join(lines)
         if updated != original:
             path.write_text(updated, encoding="utf-8", newline="\n")
-    return changed
+            touched.append(doc_rel)
+    return sorted(touched)
 
 
 def broken_links(root: Path) -> list[tuple[str, str]]:
@@ -834,7 +842,10 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
 
     mapping_path = root / MAPPING_RELATIVE
     if not mapping_path.is_file():
-        write_mapping(root, plan(root), None)
+        raise Blocked(
+            "매핑이 없다 — 먼저 `plan` 을 돌려 제안을 확인하고, "
+            "자리가 안 정해진(`?`) 문서의 role 을 채운 뒤 다시 실행할 것"
+        )
     mapping = read_mapping(root)
 
     unresolved = [f["from"] for f in mapping["files"] if f["role"] == "?"]
@@ -903,14 +914,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         merge_into(root, item["from"], item["merge"], today=None)
         moved.append((item["from"], item["merge"]))
 
-    # `rewrite_links` only reports how many links changed, not which files —
-    # hash the markdown tree around the call to learn which paths it wrote,
-    # so the final commit can be scoped to exactly them.
-    before_hashes = {p: sha1_of(p) for p in _markdown(root)}
-    rewrite_links(root, moved)
-    rewritten = [
-        p for p in _markdown(root) if sha1_of(p) != before_hashes.get(p)
-    ]
+    rewritten = rewrite_links(root, moved)
 
     mapping["gitSetup"] = {
         "init": setup.init, "gitignoreAdded": setup.gitignore_added,
@@ -930,7 +934,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     else:
         touched = {MAPPING_RELATIVE.as_posix()}
         touched.update(to for _, to in moved)
-        touched.update(p.relative_to(root).as_posix() for p in rewritten)
+        touched.update(rewritten)
         run_git(root, "add", "--", *sorted(touched))
     run_git(root, "commit", "-m", "feat: girok 이식")
 
