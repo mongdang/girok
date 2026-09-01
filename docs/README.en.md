@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/hero.svg" alt="girok — keep the documentation rules in one place and make every repository follow the same ones" width="880">
+  <img src="images/en/hero.svg" alt="girok — keep the documentation rules in one place and make every repository follow the same ones" width="880">
 </p>
 
 <p align="center">
@@ -21,18 +21,18 @@
 </p>
 
 <p align="center">
-  <img src="images/survey.svg" alt="Running /notes — it reads the repository and proposes a configuration" width="700">
+  <img src="images/en/survey.svg" alt="Running /notes — it reads the repository and proposes a configuration" width="700">
 </p>
 
 <p align="center">
   <sub>Adoption is one <code>/notes</code>. It <b>reads the repository before it writes anything</b> and infers the configuration from conventions you already use.<br>
-  <i>Screenshots are real output — which the plugin prints in Korean.</i></sub>
+  <i>Screenshots show the real output, translated — the plugin itself prints Korean.</i></sub>
 </p>
 
 > [!NOTE]
-> The plugin's own console output and shipped documents are Korean. This page is the English
-> guide to what it does and how to run it. Everything described here works the same in any
-> language — the linter, the hooks and the safety gate are language-agnostic.
+> The plugin's own console output and shipped rule documents are Korean — the screenshots on
+> this page are translations of real runs. Everything mechanical is language-agnostic: the
+> linter, the hooks and the safety gate do not care what language you write in.
 
 ---
 
@@ -141,7 +141,7 @@ and its output is a proposal.
 It asks for confirmation before creating anything.
 
 <p align="center">
-  <img src="images/init.svg" alt="Initialization — it creates only what was missing and keeps what already existed" width="720">
+  <img src="images/en/init.svg" alt="Initialization — it creates only what was missing and keeps what already existed" width="720">
 </p>
 
 Commit the result. `.claude/settings.json` in particular has to be committed for teammates to
@@ -159,7 +159,7 @@ rule revision, the current worker, the state of the status board and any open ga
 already in context.
 
 <p align="center">
-  <img src="images/session.svg" alt="Session start — revision, worker, status board and gate state are already injected" width="720">
+  <img src="images/en/session.svg" alt="Session start — revision, worker, status board and gate state are already injected" width="720">
 </p>
 
 ## What ships
@@ -190,7 +190,7 @@ already in context.
 | `notes_adopt.py` | Migrating existing notes into girok's layout — `backup` · `plan` · `apply` · `verify` |
 
 <p align="center">
-  <img src="images/lint.svg" alt="Linter output — broken tables, dead anchors, missing ADRs, local absolute paths" width="760">
+  <img src="images/en/lint.svg" alt="Linter output — broken tables, dead anchors, missing ADRs, local absolute paths" width="760">
 </p>
 
 The linters run **from the committed snapshot**, so CI needs nothing installed:
@@ -229,7 +229,7 @@ that is off protects nothing.
 Force push is blocked. If you genuinely need it, run it **with a reason**:
 
 <p align="center">
-  <img src="images/block.svg" alt="Force push is blocked — it asks for a reason, not a switch" width="760">
+  <img src="images/en/block.svg" alt="Force push is blocked — it asks for a reason, not a switch" width="760">
 </p>
 
 ```bash

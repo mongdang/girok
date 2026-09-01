@@ -50,6 +50,11 @@ TOKENS = [
     (re.compile(r"^\[생성\]"), GREEN),
     (re.compile(r"^\[유지\]"), DIM),
     (re.compile(r"^\[girok\]"), GREEN),
+    (re.compile(r"^\[fail\]"), RED),
+    (re.compile(r"^\[blocked\]"), RED),
+    (re.compile(r"^\[warn\]"), AMBER),
+    (re.compile(r"^\[created\]"), GREEN),
+    (re.compile(r"^\[kept\]\s*"), DIM),
 ]
 
 
@@ -227,10 +232,85 @@ CARDS["block"] = (
 )
 
 
-def hero() -> str:
+HERO_KO = {
+    "label": "girok — 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다",
+    "line1": "문서 규칙은 한 곳에만 두고,",
+    "line2": ("모든 저장소가 ", "같은", " 규칙을 따르게 한다"),
+    "sub": "A documentation methodology as a Claude Code plugin — the rules ship frozen into every repo that adopts them.",
+    "chips": [
+        ("현황판 · ADR", GREEN, "#182119"),
+        ("문서 검사기", AMBER, "#211D16"),
+        ("안전 게이트", RED, "#211714"),
+        (".method/ 동결 사본", BLUE, "#161C22"),
+    ],
+    "flow": [
+        ("플러그인", "규칙 원본 하나", GREEN, "#182119"),
+        (".method/", "저장소에 커밋된다", AMBER, "#211D16"),
+        ("저장소", "clone 만 해도 읽힌다", "#9AA4B2", "#171B20"),
+    ],
+    "edges": ["sync", "CI 검증"],
+}
+
+HERO_EN = {
+    "label": "girok — keep the documentation rules in one place and make every repository follow the same ones",
+    "line1": "Keep the documentation rules in one place,",
+    "line2": ("and make every repo follow the ", "same", " ones"),
+    "sub": "A Claude Code plugin — status board, ADRs, a docs linter, and a safety gate an agent cannot close.",
+    "chips": [
+        ("Status board · ADR", GREEN, "#182119"),
+        ("Docs linter", AMBER, "#211D16"),
+        ("Safety gate", RED, "#211714"),
+        (".method/ frozen copy", BLUE, "#161C22"),
+    ],
+    "flow": [
+        ("Plugin", "one original", GREEN, "#182119"),
+        (".method/", "committed to the repo", AMBER, "#211D16"),
+        ("Repository", "readable from a clone", "#9AA4B2", "#171B20"),
+    ],
+    "edges": ["sync", "CI verifies"],
+}
+
+
+def sans_width(s: str, fs: float) -> float:
+    """비례 글꼴 폭 추정 — CJK 는 전각, 라틴은 대략 0.55em."""
+    return sum(fs if ord(c) > 0x2000 else fs * 0.55 for c in s)
+
+
+def hero(t: dict) -> str:
     w, h = 1000, 340
-    label = "girok — 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다"
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="{label}">
+
+    chips, x = [], 70.0
+    for label, color, bg in t["chips"]:
+        cw = sans_width(label, 12) + 30
+        chips.append(
+            f'<rect x="{x:.0f}" y="270" width="{cw:.0f}" height="28" rx="6" '
+            f'fill="{bg}" stroke="{color}"/>'
+            f'<text x="{x + cw / 2:.0f}" y="289" text-anchor="middle" fill="{color}">'
+            f'{esc(label)}</text>'
+        )
+        x += cw + 12
+
+    flow, y = [], 56.0
+    for i, (head, sub, color, bg) in enumerate(t["flow"]):
+        flow.append(
+            f'<rect x="736" y="{y:.0f}" width="196" height="58" rx="8" fill="{bg}" '
+            f'stroke="{color if i < 2 else "#4B5563"}"/>'
+            f'<text x="834" y="{y + 24:.0f}" text-anchor="middle" font-family="{SANS}" '
+            f'font-size="12.5" fill="{color}">{esc(head)}</text>'
+            f'<text x="834" y="{y + 43:.0f}" text-anchor="middle" font-family="{SANS}" '
+            f'font-size="11" fill="{DIM}">{esc(sub)}</text>'
+        )
+        if i < len(t["flow"]) - 1:
+            flow.append(
+                f'<path d="M834 {y + 58:.0f} V{y + 90:.0f}" stroke="{DIM}" stroke-width="1.5"/>'
+                f'<path d="M829 {y + 84:.0f} l5 8 l5 -8" fill="none" stroke="{DIM}" stroke-width="1.5"/>'
+                f'<text x="846" y="{y + 80:.0f}" font-family="{MONO}" font-size="10.5" '
+                f'fill="{DIM}">{esc(t["edges"][i])}</text>'
+            )
+        y += 92
+
+    a, bold, c = t["line2"]
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-label="{esc(t["label"])}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0F1319"/>
@@ -248,51 +328,129 @@ def hero() -> str:
   <text x="268" y="120" font-family="{MONO}" font-size="15" fill="{GREEN}">기록</text>
   <rect x="70" y="142" width="86" height="3" rx="1.5" fill="{GREEN}"/>
 
-  <text x="70" y="186" font-family="{SANS}" font-size="19" fill="#D6DEE8">문서 규칙은 한 곳에만 두고,</text>
-  <text x="70" y="214" font-family="{SANS}" font-size="19" fill="#D6DEE8">모든 저장소가 <tspan font-weight="700" fill="#FFFFFF">같은</tspan> 규칙을 따르게 한다</text>
-  <text x="70" y="246" font-family="{SANS}" font-size="12.5" fill="{DIM}">A documentation methodology as a Claude Code plugin — the rules ship frozen into every repo that adopts them.</text>
+  <text x="70" y="186" font-family="{SANS}" font-size="19" fill="#D6DEE8">{esc(t["line1"])}</text>
+  <text x="70" y="214" font-family="{SANS}" font-size="19" fill="#D6DEE8">{esc(a)}<tspan font-weight="700" fill="#FFFFFF">{esc(bold)}</tspan>{esc(c)}</text>
+  <text x="70" y="246" font-family="{SANS}" font-size="12.5" fill="{DIM}">{esc(t["sub"])}</text>
 
   <g font-family="{SANS}" font-size="12">
-    <rect x="70" y="270" width="132" height="28" rx="6" fill="#182119" stroke="{GREEN}"/>
-    <text x="136" y="289" text-anchor="middle" fill="{GREEN}">현황판 · ADR</text>
-    <rect x="214" y="270" width="112" height="28" rx="6" fill="#211D16" stroke="{AMBER}"/>
-    <text x="270" y="289" text-anchor="middle" fill="{AMBER}">문서 검사기</text>
-    <rect x="338" y="270" width="112" height="28" rx="6" fill="#211714" stroke="{RED}"/>
-    <text x="394" y="289" text-anchor="middle" fill="{RED}">안전 게이트</text>
-    <rect x="462" y="270" width="164" height="28" rx="6" fill="#161C22" stroke="{BLUE}"/>
-    <text x="544" y="289" text-anchor="middle" fill="{BLUE}">.method/ 동결 사본</text>
+    {"".join(chips)}
   </g>
 
   <g opacity="0.9">
-    <rect x="736" y="56" width="196" height="58" rx="8" fill="#182119" stroke="{GREEN}"/>
-    <text x="834" y="80" text-anchor="middle" font-family="{SANS}" font-size="12.5" fill="{GREEN}">플러그인</text>
-    <text x="834" y="99" text-anchor="middle" font-family="{SANS}" font-size="11" fill="{DIM}">규칙 원본 하나</text>
-
-    <path d="M834 114 V146" stroke="{DIM}" stroke-width="1.5"/>
-    <path d="M829 140 l5 8 l5 -8" fill="none" stroke="{DIM}" stroke-width="1.5"/>
-    <text x="846" y="136" font-family="{MONO}" font-size="10.5" fill="{DIM}">sync</text>
-
-    <rect x="736" y="148" width="196" height="58" rx="8" fill="#211D16" stroke="{AMBER}"/>
-    <text x="834" y="172" text-anchor="middle" font-family="{SANS}" font-size="12.5" fill="{AMBER}">.method/</text>
-    <text x="834" y="191" text-anchor="middle" font-family="{SANS}" font-size="11" fill="{DIM}">저장소에 커밋된다</text>
-
-    <path d="M834 206 V238" stroke="{DIM}" stroke-width="1.5"/>
-    <path d="M829 232 l5 8 l5 -8" fill="none" stroke="{DIM}" stroke-width="1.5"/>
-    <text x="846" y="228" font-family="{MONO}" font-size="10.5" fill="{DIM}">CI 검증</text>
-
-    <rect x="736" y="240" width="196" height="58" rx="8" fill="#171B20" stroke="#4B5563"/>
-    <text x="834" y="264" text-anchor="middle" font-family="{SANS}" font-size="12.5" fill="#9AA4B2">저장소</text>
-    <text x="834" y="283" text-anchor="middle" font-family="{SANS}" font-size="11" fill="{DIM}">clone 만 해도 읽힌다</text>
+    {"".join(flow)}
   </g>
 </svg>
 '''
 
 
+# 영문 판본 — 콘솔 출력은 한국어로 나오므로 이쪽은 번역이다.
+# 영어 README 가 한국어 캡처만 싣고 있으면 그 페이지를 둔 이유가 없어진다.
+CARDS_EN: dict[str, tuple[str, list]] = {}
+
+CARDS_EN["survey"] = (
+    "/notes — it reads the repository before it builds anything",
+    [
+        "$ /notes",
+        "",
+        "Repository: trading-bot · 43 documents",
+        "",
+        "Proposed configuration:",
+        ("  notes location", "."),
+        ("  status board", "STATE.md"),
+        ("  decision records", "decisions (numbered)"),
+        ("  linted folders", "decisions, docs, experiments"),
+        ("  safety gate", "off"),
+        ("  archive", "off"),
+        ("  parallel work", "off"),
+        "",
+        "1 thing to look at:",
+        '  - `CLAUDE.md` states "do not create an archive folder" — following',
+        "    that convention, the archive module is turned off",
+        "",
+        "This is a proposal — nothing was written. Confirm before initializing.",
+    ],
+)
+
+CARDS_EN["init"] = (
+    "It only builds after you confirm — existing files are left alone",
+    [
+        "$ /notes  →  confirmed",
+        "",
+        "[created] .claude/girok.json",
+        "[created] .claude/settings.json",
+        "[created] notes/CLAUDE.md",
+        "[created] notes/GEMINI.md",
+        "[created] notes/AGENTS.md",
+        "[created] notes/docs/PROGRESS.md",
+        "[created] notes/docs/decisions/README.md",
+        "[created] notes/docs/SAFETY_GATE.md",
+        ("[kept]    README.md", "← already there. not overwritten"),
+        ("[created] notes/.method/", "← frozen copy of the ruleset"),
+        "",
+        "10 created, 1 kept",
+    ],
+)
+
+CARDS_EN["session"] = (
+    "By the time the session starts, it already knows where things stand",
+    [
+        "$ cd my-robot && claude",
+        "",
+        "[girok] ready v0.18.0",
+        "worker abc (resolved from git user.email)",
+        "board notes/docs_abc/PROGRESS.md — 0 active risks, 0 open questions",
+        "safety gate 1 OPEN",
+        "",
+        "Safety: while a gate item is OPEN, do not run or suggest hardware",
+        "motion commands (homing, jogging, automated tests). Only a human",
+        "fills in an item's verifier field — never the agent.",
+    ],
+)
+
+CARDS_EN["lint"] = (
+    "The linter runs the moment a document is written",
+    [
+        "$ python notes/.method/scripts/check_docs.py",
+        "",
+        "[fail] notes/docs/SETUP.md -> table broken by a blank line — rows from",
+        "       line 14 render as text outside the table",
+        "[fail] notes/docs/SETUP.md -> TOC anchor `#calibration` has no heading",
+        "[fail] notes/docs/SETUP.md -> cites ADR-042, which does not exist",
+        "[warn] notes/CLAUDE.md -> no `## Contents` (2,479 bytes)",
+        "[warn] notes/docs/SETUP.md -> local absolute path (C:\\Users\\abc\\build)",
+        "       — differs per machine. use the repo name and a relative path",
+        "",
+        "7 documents checked, 3 failed",
+    ],
+)
+
+CARDS_EN["block"] = (
+    "It asks for a reason, not a switch",
+    [
+        "$ git push origin +master",
+        "",
+        "[blocked] force push — history is itself a decision record and is hard",
+        "          to undo. To tidy history, use a tree-identical commit (`-s",
+        "          ours` linking the ancestor). If you still must, run it with",
+        "          GIROK_FORCE_PUSH_REASON — a reason, not a switch (8+ chars).",
+        "          That reason stays on the session record",
+        "",
+        '$ GIROK_FORCE_PUSH_REASON="history reset — instructed 2026-09-01" \\',
+        "    git push origin +master",
+        "",
+        "[girok] rule broken: force push · reason is on the record",
+    ],
+)
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    written = [("hero.svg", hero())]
+    (OUT / "en").mkdir(exist_ok=True)
+    written = [("hero.svg", hero(HERO_KO)), ("en/hero.svg", hero(HERO_EN))]
     for name, (title, lines) in CARDS.items():
         written.append((f"{name}.svg", terminal(title, lines)))
+    for name, (title, lines) in CARDS_EN.items():
+        written.append((f"en/{name}.svg", terminal(title, lines)))
     for name, svg in written:
         (OUT / name).write_text(svg, encoding="utf-8", newline="\n")
         print(f"[생성] docs/images/{name}")
