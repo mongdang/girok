@@ -163,3 +163,42 @@ def test_html_inside_a_code_block_is_left_alone(tmp_path):
 
     assert changed == 0
     assert '<img src="old/그림.png">' in (root / "PROGRESS.md").read_text(encoding="utf-8")
+
+
+def test_a_percent_encoded_destination_follows_the_move(tmp_path):
+    root = tmp_path / "r"
+    write(root / "PROGRESS.md", "[문서](my%20file.md)\n")
+
+    changed = notes_adopt.rewrite_links(root, [("my file.md", "docs/my file.md")])
+
+    assert changed == 1
+    text = (root / "PROGRESS.md").read_text(encoding="utf-8")
+    assert "(docs/my file.md)" in text
+
+
+def test_a_percent_encoded_destination_that_resolves_is_not_reported_broken(tmp_path):
+    root = tmp_path / "r"
+    write(root / "PROGRESS.md", "[문서](my%20file.md)\n")
+    write(root / "my file.md", "# x\n")
+
+    assert notes_adopt.broken_links(root) == []
+
+
+def test_a_link_after_an_unclosed_fence_is_left_alone(tmp_path):
+    root = tmp_path / "r"
+    write(
+        root / "PROGRESS.md",
+        "[전](decisions/001-first.md)\n"
+        "```\n"
+        "code\n"
+        "[후](decisions/001-first.md)\n",
+    )
+
+    changed = notes_adopt.rewrite_links(
+        root, [("decisions/001-first.md", "docs/decisions/ADR-001-first.md")]
+    )
+
+    assert changed == 1
+    text = (root / "PROGRESS.md").read_text(encoding="utf-8")
+    assert "[전](docs/decisions/ADR-001-first.md)" in text
+    assert "[후](decisions/001-first.md)" in text

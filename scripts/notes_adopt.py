@@ -26,6 +26,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from urllib.parse import unquote
 
 import notes_config
 
@@ -681,12 +682,17 @@ def _iter_inline_links(line: str):
 
 
 def _retarget(doc_rel: str, link: str, moves: dict[str, str]) -> str | None:
-    """The new relative link, or None if this one does not point at a move."""
+    """The new relative link, or None if this one does not point at a move.
+
+    `link` is percent-decoded before it is matched against the moves table —
+    `my%20file.md` and `my file.md` name the same file. The anchor rides
+    along separately and is never touched by this.
+    """
     if EXTERNAL.match(link):
         return None
     here = Path(doc_rel).parent
     try:
-        target = (here / link).as_posix()
+        target = (here / unquote(link)).as_posix()
         target = Path(os.path.normpath(target)).as_posix()
     except ValueError:
         return None
@@ -787,7 +793,9 @@ def broken_links(root: Path) -> list[tuple[str, str]]:
             for link in dests:
                 if EXTERNAL.match(link):
                     continue
-                target = Path(os.path.normpath((here / link).as_posix()))
+                # `link` (as written in the document) is what gets reported;
+                # only the existence check needs the percent-decoded path.
+                target = Path(os.path.normpath((here / unquote(link)).as_posix()))
                 if not (root / target).exists():
                     broken.append((doc_rel, link))
     return broken
