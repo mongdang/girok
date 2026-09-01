@@ -5,6 +5,8 @@ that reversible, so it runs before `git init`, before the skeleton, before
 anything — otherwise it captures a repository girok has already edited and
 calling it "the original" is a lie.
 """
+from pathlib import Path
+
 import notes_adopt
 import pytest
 
@@ -73,3 +75,50 @@ def test_measure_counts_bytes_not_just_files(tmp_path):
     write(root / "b" / "c.md", "678")
 
     assert notes_adopt.measure(root) == (2, 8)
+
+
+def test_size_map_distinguishes_same_totals_different_distribution(tmp_path):
+    a = tmp_path / "a"
+    write(a / "x.md", "12345")
+    write(a / "y.md", "678")
+
+    b = tmp_path / "b"
+    write(b / "x.md", "123")
+    write(b / "y.md", "45678")
+
+    assert notes_adopt.measure(a) == notes_adopt.measure(b)
+    assert notes_adopt._size_map(a) != notes_adopt._size_map(b)
+
+
+def test_a_failed_copy_leaves_no_target_but_keeps_the_partial(repo, monkeypatch):
+    def broken_copytree(src, dst, **kwargs):
+        Path(dst).mkdir(parents=True)
+        (Path(dst) / "STATE.md").write_text("일부만", encoding="utf-8")
+        raise OSError("디스크 가득함")
+
+    monkeypatch.setattr(notes_adopt.shutil, "copytree", broken_copytree)
+
+    with pytest.raises(notes_adopt.BackupFailed):
+        notes_adopt.backup(repo, today="20260901")
+
+    target = repo.parent / "eq-agent-v3-girok-backup-20260901"
+    partial = repo.parent / "eq-agent-v3-girok-backup-20260901.partial"
+    assert not target.exists()
+    assert partial.exists()
+
+
+def test_a_stale_partial_is_cleared_and_retried(repo, monkeypatch):
+    def broken_copytree(src, dst, **kwargs):
+        Path(dst).mkdir(parents=True)
+        raise OSError("디스크 가득함")
+
+    monkeypatch.setattr(notes_adopt.shutil, "copytree", broken_copytree)
+    with pytest.raises(notes_adopt.BackupFailed):
+        notes_adopt.backup(repo, today="20260901")
+    monkeypatch.undo()
+
+    result = notes_adopt.backup(repo, today="20260901")
+
+    assert not result.skipped
+    assert result.path.is_dir()
+    assert (result.path / "STATE.md").is_file()

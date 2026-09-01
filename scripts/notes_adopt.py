@@ -16,6 +16,7 @@ all, and `verify` proves after the fact that every byte survived.
     python notes_adopt.py verify
 """
 import argparse
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -37,19 +38,38 @@ class BackupResult:
     skipped: bool = False
 
 
+def _size_map(root: Path) -> dict[str, int]:
+    """Every file under `root`, by relative path, with its size.
+
+    The distribution matters as much as the totals — two trees can agree on
+    file count and total bytes while disagreeing on which file holds what.
+    """
+    sizes: dict[str, int] = {}
+    for path in root.rglob("*"):
+        if path.is_file() and not path.is_symlink():
+            sizes[path.relative_to(root).as_posix()] = path.stat().st_size
+    return sizes
+
+
 def measure(root: Path) -> tuple[int, int]:
     """Every file under `root` and their total size, with nothing skipped.
 
     Counting is the verification: a copy that matches on both numbers is a
     copy. Excluding anything here would exclude it from the check too.
     """
-    files = 0
-    size = 0
-    for path in root.rglob("*"):
-        if path.is_file() and not path.is_symlink():
-            files += 1
-            size += path.stat().st_size
-    return files, size
+    sizes = _size_map(root)
+    return len(sizes), sum(sizes.values())
+
+
+def _diff_message(before: dict[str, int], after: dict[str, int]) -> str:
+    """Describe how two size maps disagree, for a `BackupFailed` message."""
+    missing = sorted(set(before) - set(after))
+    differing = sorted(p for p in set(before) & set(after) if before[p] != after[p])
+    first = (missing + differing)[0]
+    return (
+        f"백업이 원본과 다르다 — 빠진 경로 {len(missing)}개, "
+        f"크기가 다른 경로 {len(differing)}개, 첫 항목 `{first}`"
+    )
 
 
 def backup(root: Path, today: str | None = None) -> BackupResult:
@@ -57,6 +77,11 @@ def backup(root: Path, today: str | None = None) -> BackupResult:
 
     Nothing is excluded — not `.git`, not build output. An exclusion list is
     a list of things that cannot be restored, and disks are cheap.
+
+    The copy lands at a `.partial` name first and is only renamed to the
+    final name once it has been measured against the original. A crash
+    mid-copy must not leave a half-copied tree wearing the name that later
+    runs (and people) trust as "the finished backup".
     """
     root = Path(root).resolve()
     if notes_config.is_workspace(root):
@@ -71,16 +96,27 @@ def backup(root: Path, today: str | None = None) -> BackupResult:
         files, size = measure(target)
         return BackupResult(path=target, files=files, bytes=size, skipped=True)
 
-    shutil.copytree(root, target, symlinks=True)
+    partial = root.parent / f"{root.name}-girok-backup-{stamp}.partial"
+    if partial.exists():
+        shutil.rmtree(partial)
+        print(f"[백업] 지난 실행이 중간에 실패해 남아있던 {partial.name} 을 지우고 새로 시작한다")
 
-    before = measure(root)
-    after = measure(target)
+    try:
+        shutil.copytree(root, partial, symlinks=True)
+    except Exception as exc:
+        raise BackupFailed(
+            f"백업 복사 중 오류가 났다 — {exc}. {partial.name} 에 중간 상태가 남아있으니 확인할 것"
+        ) from exc
+
+    before = _size_map(root)
+    after = _size_map(partial)
     if before != after:
         raise BackupFailed(
-            f"백업이 원본과 다르다 — 원본 {before[0]}개/{before[1]:,}바이트, "
-            f"백업 {after[0]}개/{after[1]:,}바이트. 아무것도 옮기지 않았다"
+            f"{_diff_message(before, after)}. {partial.name} 을 지우지 않았으니 확인할 것"
         )
-    return BackupResult(path=target, files=after[0], bytes=after[1])
+
+    os.replace(partial, target)
+    return BackupResult(path=target, files=len(after), bytes=sum(after.values()))
 
 
 def main(argv: list[str] | None = None) -> int:
