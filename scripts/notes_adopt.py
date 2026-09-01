@@ -575,13 +575,19 @@ def merge_into(root: Path, source: str, target: str, today: str | None = None) -
         src.unlink(missing_ok=True)
 
 
-# Inline `[text](path)` and `![alt](path)`, plus reference definitions
-# `[label]: path`. Anchors and titles are captured separately so they ride
-# along unchanged.
-INLINE_LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s#]+)((?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\))")
+# `[text](` / `![alt](` — only the opening. The destination itself is
+# hand-scanned by `_parse_dest` because it may be wrapped in `<...>`, hold a
+# literal space, or nest one level of parens: shapes no single character
+# class captures without either missing them or truncating them.
+INLINE_LINK = re.compile(r"!?\[[^\]]*\]\(")
+# Reference-style definitions `[label]: path` — destinations here are never
+# angle-wrapped or spaced in practice, so a plain character class is enough.
 REFERENCE_LINK = re.compile(r"(^\s*\[[^\]]+\]:\s+)([^\s#]+)((?:#\S*)?)", re.MULTILINE)
 FENCE = re.compile(r"^\s*(```|~~~)")
 EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#)", re.IGNORECASE)
+# `<img src="...">` / `<a href='...'>`. The quotes bound the value, so
+# unlike a bare markdown destination there is nothing to hand-scan here.
+HTML_ATTR = re.compile(r'((?:src|href)=)(["\'])([^"\']*)\2', re.IGNORECASE)
 
 
 def _outside_code(text: str):
@@ -597,6 +603,81 @@ def _outside_code(text: str):
             yield line, True
             continue
         yield line, fenced
+
+
+def _parse_dest(text: str, pos: int):
+    """Parse a link destination starting at `text[pos]`, right after `](`.
+
+    Returns `(dest, anchor, title, angled, end)` — `end` is the index just
+    past the closing `)`. Returns `None` if no closing `)` is found; a
+    destination this can't close is one it can't vouch for either, so the
+    caller must not report it as a link at all, let alone a broken one.
+    """
+    angled = False
+    if pos < len(text) and text[pos] == "<":
+        close = text.find(">", pos + 1)
+        if close == -1:
+            return None
+        angled = True
+        dest = text[pos + 1:close]
+        scan_from = close + 1
+    else:
+        dest = None
+        scan_from = pos
+
+    # Find the ')' that closes the whole link, allowing one level of
+    # nested parens in a bare (unangled) destination such as `file(1).md`.
+    depth = 0
+    i = scan_from
+    while i < len(text):
+        ch = text[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            if depth == 0:
+                break
+            depth -= 1
+        i += 1
+    else:
+        return None
+    end = i + 1
+    body = text[scan_from:i]
+
+    title_match = re.search(r'\s+"[^"]*"$', body)
+    title = title_match.group(0) if title_match else ""
+    rest = body[:title_match.start()] if title_match else body
+
+    if angled:
+        anchor = rest
+    else:
+        hash_idx = rest.find("#")
+        if hash_idx == -1:
+            dest, anchor = rest, ""
+        else:
+            dest, anchor = rest[:hash_idx], rest[hash_idx:]
+
+    return dest, anchor, title, angled, end
+
+
+def _iter_inline_links(line: str):
+    """Find every `[text](dest)` / `![alt](dest)` in a line.
+
+    Yields `(start, end, opening, dest, anchor, title, angled)` so a
+    caller can replace `line[start:end]`. A destination `_parse_dest`
+    cannot close is skipped rather than guessed at.
+    """
+    pos = 0
+    while True:
+        match = INLINE_LINK.search(line, pos)
+        if match is None:
+            return
+        parsed = _parse_dest(line, match.end())
+        if parsed is None:
+            pos = match.end()
+            continue
+        dest, anchor, title, angled, end = parsed
+        yield match.start(), end, match.group(0), dest, anchor, title, angled
+        pos = end
 
 
 def _retarget(doc_rel: str, link: str, moves: dict[str, str]) -> str | None:
@@ -615,6 +696,40 @@ def _retarget(doc_rel: str, link: str, moves: dict[str, str]) -> str | None:
     return os.path.relpath(moved_to, here.as_posix() or ".").replace("\\", "/")
 
 
+def _rewrite_inline_links(line: str, doc_rel: str, moves: dict[str, str]) -> tuple[str, int]:
+    """Rewrite every `[text](dest)` / `![alt](dest)` in a line."""
+    changed = 0
+    out = []
+    pos = 0
+    for start, end, opening, dest, anchor, title, angled in _iter_inline_links(line):
+        out.append(line[pos:start])
+        new_dest = _retarget(doc_rel, dest, moves)
+        if new_dest is None:
+            out.append(line[start:end])
+        else:
+            body = f"<{new_dest}>" if angled else new_dest
+            out.append(f"{opening}{body}{anchor}{title})")
+            changed += 1
+        pos = end
+    out.append(line[pos:])
+    return "".join(out), changed
+
+
+def _rewrite_html_attrs(line: str, doc_rel: str, moves: dict[str, str]) -> tuple[str, int]:
+    """Rewrite `src="..."` / `href='...'` in embedded HTML."""
+    changed = 0
+
+    def swap(match):
+        nonlocal changed
+        new = _retarget(doc_rel, match.group(3), moves)
+        if new is None:
+            return match.group(0)
+        changed += 1
+        return f"{match.group(1)}{match.group(2)}{new}{match.group(2)}"
+
+    return HTML_ATTR.sub(swap, line), changed
+
+
 def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
     """Point every relative link at where its document went."""
     root = Path(root).resolve()
@@ -631,13 +746,8 @@ def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
                 lines.append(line)
                 continue
 
-            def swap_inline(match, doc=doc_rel):
-                nonlocal changed
-                new = _retarget(doc, match.group(2), table)
-                if new is None:
-                    return match.group(0)
-                changed += 1
-                return f"{match.group(1)}{new}{match.group(3)}"
+            line, n = _rewrite_inline_links(line, doc_rel, table)
+            changed += n
 
             def swap_reference(match, doc=doc_rel):
                 nonlocal changed
@@ -647,8 +757,9 @@ def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
                 changed += 1
                 return f"{match.group(1)}{new}{match.group(3)}"
 
-            line = INLINE_LINK.sub(swap_inline, line)
             line = REFERENCE_LINK.sub(swap_reference, line)
+            line, n = _rewrite_html_attrs(line, doc_rel, table)
+            changed += n
             lines.append(line)
 
         updated = "\n".join(lines)
@@ -658,7 +769,11 @@ def rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int:
 
 
 def broken_links(root: Path) -> list[tuple[str, str]]:
-    """Relative links that point at nothing."""
+    """Relative links that point at nothing.
+
+    A destination `_parse_dest` could not close is skipped, not reported —
+    a false "broken" kills the signal `verify` depends on.
+    """
     root = Path(root).resolve()
     broken = []
     for path in _markdown(root):
@@ -667,8 +782,9 @@ def broken_links(root: Path) -> list[tuple[str, str]]:
         for line, is_code in _outside_code(path.read_text(encoding="utf-8")):
             if is_code:
                 continue
-            for match in INLINE_LINK.finditer(line):
-                link = match.group(2)
+            dests = [dest for _, _, _, dest, _, _, _ in _iter_inline_links(line)]
+            dests += [match.group(3) for match in HTML_ATTR.finditer(line)]
+            for link in dests:
                 if EXTERNAL.match(link):
                     continue
                 target = Path(os.path.normpath((here / link).as_posix()))
