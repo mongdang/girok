@@ -30,7 +30,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/method_sync.py" status
 뼈대 생성도 이 뒤다 — 순서가 바뀌면 백업이 담는 것은 girok 이 이미 손댄 상태다.
 
 ```
-python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py backup
+python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" backup
 ```
 
 워크스페이스(저장소를 여러 개 담은 상위 폴더)로 보이면 여기서 멈춘다. 그때는 작업할
@@ -87,7 +87,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_init.py" --confirm <저장소 폴더
 뼈대만 만들고 끝내면 진짜 문서 옆에 빈 문서 한 벌이 남는다. 기존 기록을 옮긴다.
 
 ```
-python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py plan
+python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 ```
 
 읽기 전용이다. `.claude/girok-adopt.json` 에 전수 목록과 `role` 초안이 생긴다.
@@ -99,8 +99,8 @@ python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py plan
 반드시 `plan` → 사람이 `?` 를 채움 → `apply` 다.
 
 ```
-python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py apply --confirm <저장소 폴더 이름>
-python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py verify
+python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" apply --confirm <저장소 폴더 이름>
+python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" verify
 ```
 
 `apply` 는 이식 전체를 커밋 하나로 묶고 `girok-adopt-before-<날짜>` 태그를 남긴다.
@@ -154,7 +154,7 @@ MAJOR 버전이 올랐으면 `migrations/` 에 해당 문서가 있는지 확인
 python "${CLAUDE_PLUGIN_ROOT}/scripts/method_sync.py" verify
 python "${CLAUDE_PLUGIN_ROOT}/scripts/check_docs.py"
 python "${CLAUDE_PLUGIN_ROOT}/scripts/marker_scan.py"
-python "${CLAUDE_PLUGIN_ROOT}"/scripts/notes_adopt.py plan
+python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 ```
 
 그리고 현황을 한 문단으로 보고한다:
