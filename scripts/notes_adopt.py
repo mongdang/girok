@@ -130,6 +130,17 @@ MAPPING_RELATIVE = Path(".claude") / "girok-adopt.json"
 # relocate a document, it hides it from the agent that needs it.
 ROOT_FIXED = ("CLAUDE.md", "AGENTS.md", "GEMINI.md", "RULES.md")
 
+# The safety gate, opened by this exact name under the docs folder by
+# `check_docs`, `marker_scan` and the gate hook.
+GATE_NAME = "SAFETY_GATE.md"
+
+# Every name girok's own code looks up literally rather than by search.
+# Normalizing one does not rename a document, it switches off whatever reads
+# it — a `safety-gate.md` reads as "no gate", which reads as "nothing OPEN",
+# which lets a real motion command through. Anything added here has to be a
+# name some tool opens directly.
+FIXED_NAMES = ROOT_FIXED + (GATE_NAME,)
+
 # Folders another tool writes into and reads back by path.
 FOREIGN_DIRS = ("docs/superpowers",)
 
@@ -175,7 +186,7 @@ def _markdown(root: Path) -> list[Path]:
     return found
 
 
-def _classify(rel: str, cfg, decisions_prefix: str) -> tuple[str, str]:
+def _classify(rel: str, cfg, decisions_prefix: str, workers: tuple = ()) -> tuple[str, str]:
     """The role this document plays, and why the rules think so.
 
     Only what the rules are certain about. `?` is the honest answer for the
@@ -185,10 +196,20 @@ def _classify(rel: str, cfg, decisions_prefix: str) -> tuple[str, str]:
     `decisions_prefix` is the decisions folder relative to the *repository
     root*. `cfg.decisions_dir` is an absolute Path and `decisions_relative`
     is relative to the notes folder, so neither compares against `rel`.
+
+    `workers` are the parallel-mode `docs_<id>/` folders, also relative to
+    the repository root.
     """
     name = Path(rel).name
     if name in ROOT_FIXED and "/" not in rel:
         return "rules", "도구가 저장소 루트에서 읽는 파일"
+    # Every dot folder belongs to some tool that opens its files by path:
+    # `.claude/commands`, `.github/` templates, `.superpowers/` ledgers.
+    # Flattening one into `docs/` deletes the feature, not just the file.
+    if rel.split("/", 1)[0].startswith("."):
+        return "foreign", "점(.)으로 시작하는 도구 폴더 — 경로로 읽힌다"
+    if any(rel == w or rel.startswith(w + "/") for w in workers):
+        return "worker", "병행 작업 개인 폴더 — 공용 문서와 섞지 않는다"
     if any(rel.startswith(d + "/") for d in FOREIGN_DIRS):
         return "foreign", "다른 도구가 경로로 읽는 폴더"
     if cfg.board and name == cfg.board:
@@ -212,8 +233,17 @@ def _destination(entry: Entry, cfg, notes: str) -> str | None:
 
     `notes` is "" when the notes folder is the repository root itself — the
     `notesDir: "."` layout, which is a supported value and stays put.
+
+    The destinations are girok's standard layout rather than whatever
+    `docRoots`/`decisionsDir` currently say, because moving the repository
+    onto the standard is what this command is for — `update_config` then
+    rewrites the config so it describes where the files actually are.
+
+    `keep` is a person's answer to a `?`: read it, decided it stays. It
+    exists so that decision has somewhere to live besides an argument
+    every check repeats.
     """
-    if entry.role in ("rules", "foreign", "skip", "?"):
+    if entry.role in ("rules", "foreign", "skip", "worker", "keep", "?"):
         return None
     if entry.role == "board":
         return f"{notes}PROGRESS.md"
@@ -237,10 +267,13 @@ def plan(root: Path) -> list[Entry]:
     decisions = _decisions_prefix(root, cfg)
     notes_rel = cfg.notes_dir.resolve().relative_to(root).as_posix()
     notes = "" if notes_rel == "." else notes_rel + "/"
+    workers = tuple(
+        w.resolve().relative_to(root).as_posix() for w in cfg.worker_dirs()
+    )
     entries = []
     for path in _markdown(root):
         rel = path.relative_to(root).as_posix()
-        role, why = _classify(rel, cfg, decisions)
+        role, why = _classify(rel, cfg, decisions, workers)
         entry = Entry(
             frm=rel, role=role, sha1=sha1_of(path),
             bytes=path.stat().st_size, why=why,
@@ -477,8 +510,11 @@ def normalize_name(name: str, role: str, adr_style: str) -> str:
     """A file name that sorts and reads the same everywhere.
 
     Korean names are kept as they are: transliterating them would trade a
-    name that means something for one that does not.
+    name that means something for one that does not. A name girok itself
+    opens literally is kept for a harder reason — see `FIXED_NAMES`.
     """
+    if name in FIXED_NAMES:
+        return name
     stem, dot, suffix = name.rpartition(".")
     if not dot:
         stem, suffix = name, ""

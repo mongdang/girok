@@ -6,6 +6,7 @@ and `apply` refuses while any remain. Guessing here would be worse than
 asking, because a wrong guess arrives as a moved file.
 """
 import json
+from pathlib import Path
 
 import notes_adopt
 import pytest
@@ -101,3 +102,62 @@ def test_planning_moves_nothing(repo):
     notes_adopt.plan(repo)
 
     assert notes_adopt.measure(repo) == before
+
+
+def test_a_dot_folder_is_never_moved(repo):
+    # `.claude/` is read by path — a flattened copy in `docs/` is a
+    # definition Claude Code can no longer find, and `.github/` templates
+    # die the same way. This tool's own subject is repositories that have
+    # these folders.
+    write(repo / ".claude" / "commands" / "notes.md", "# 명령\n")
+    write(repo / ".github" / "PULL_REQUEST_TEMPLATE.md", "# PR\n")
+    write(repo / ".superpowers" / "sdd" / "x" / "progress.md", "# 원장\n")
+
+    found = _by_source(notes_adopt.plan(repo))
+
+    for rel in (
+        ".claude/commands/notes.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".superpowers/sdd/x/progress.md",
+    ):
+        assert found[rel].role == "foreign", rel
+        assert found[rel].to is None, rel
+
+
+def test_the_safety_gate_keeps_its_exact_name(repo):
+    # `check_docs`, `marker_scan` and the gate hook all open
+    # `SAFETY_GATE.md` by that name. A normalized `safety-gate.md` reads as
+    # "no gate", which reads as "nothing OPEN", which lets real motion
+    # commands through.
+    write(repo / "docs" / "SAFETY_GATE.md", "# 안전 게이트\n")
+
+    entry = _by_source(notes_adopt.plan(repo))["docs/SAFETY_GATE.md"]
+
+    assert notes_adopt.normalize_name(
+        Path(entry.to).name, entry.role, "adr-prefixed"
+    ) == "SAFETY_GATE.md"
+
+
+def test_a_worker_folder_stays_private(repo):
+    # `docs_<id>/` is one person's own folder under parallel mode. Flattening
+    # it into the shared `docs/` erases that separation, and its board
+    # collides with the real one.
+    write(repo / "docs_kim" / "PROGRESS.md", "# 김 현황\n")
+    write(repo / "docs_kim" / "메모.md", "# 메모\n")
+
+    found = _by_source(notes_adopt.plan(repo))
+
+    assert found["docs_kim/PROGRESS.md"].role == "worker"
+    assert found["docs_kim/PROGRESS.md"].to is None
+    assert found["docs_kim/메모.md"].to is None
+
+
+def test_a_document_confirmed_in_place_no_longer_needs_a_decision(repo):
+    # The root `README.md` is permanently `?` by rule, so a repository that
+    # decided to leave it alone reported "one unadopted document" forever.
+    # `keep` is where that decision goes.
+    entry = notes_adopt.Entry(
+        frm="README.md", role="keep", sha1="x", bytes=1, why="사람이 제자리로 확정",
+    )
+
+    assert notes_adopt._destination(entry, None, "") is None
