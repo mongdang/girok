@@ -91,19 +91,43 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 ```
 
 읽기 전용이다. `.claude/girok-adopt.json` 에 전수 목록과 `role` 초안이 생긴다.
+백업 폴더는 저장소 바로 바깥에 `<저장소명>-girok-backup-<YYYYMMDD>` 이름으로 생긴다.
 
-**`role` 이 `?` 인 항목은 규칙이 판단하지 못한 것이다. 그 문서를 직접 읽고 채운다** —
-`to`(어디로) 와, 다른 문서에 합쳐야 하면 `merge`(어느 문서에) 를 적는다. 채운 결과를
-표로 사용자에게 보여주고 승인을 받는다. `?` 가 하나라도 남으면 다음 단계가 거부한다 —
-그리고 매핑 파일 자체가 없으면 `apply` 는 스스로 만들지 않고 곧바로 거부한다. 순서는
-반드시 `plan` → 사람이 `?` 를 채움 → `apply` 다.
+**`role` 이 `?` 인 항목은 규칙이 판단하지 못한 것이다. 그 문서를 직접 읽고 채운다.**
+`apply` 는 `role` 로 거부하므로 `role` 을 채운다 — `to` 만 고치면 계속 막힌다.
+
+| 채울 것 | 규칙 |
+|---|---|
+| `role` | `board`·`adr`·`doc` 중 하나. 옮기지 않기로 했으면 `keep` |
+| `to` | 옮길 자리. `role` 을 고치고 `plan` 을 다시 돌리면 규칙이 채워준다 |
+| `merge` | 다른 문서에 합칠 때만. **`merge` 를 적으면 `to` 는 `null` 로 둔다** |
+
+`merge` 의 값은 **이동 후 경로**로 적는다. 병합은 이동이 끝난 뒤에 일어나므로, 표에서
+읽은 현재 이름(`STATE.md`)을 적으면 그 문서는 이미 `PROGRESS.md` 로 가 있다 — 대상이
+없으면 `apply` 가 거부한다.
+
+채운 결과를 표로 사용자에게 보여주고 승인을 받는다. `?` 가 하나라도 남으면 다음 단계가
+거부한다 — 그리고 매핑 파일 자체가 없으면 `apply` 는 스스로 만들지 않고 곧바로
+거부한다. 순서는 반드시 `plan` → 사람이 `?` 를 채움 → `apply` 다.
+
+> [!CAUTION]
+> **이 저장소를 고쳐도 되는지 다시 확인한다.** `readOnlyRepos` 는 push 명령만 막고,
+> 참고 저장소 여부는 저장소 안에 적혀 있지 않다 — `apply` 는 그것을 모른 채 파일을
+> 옮긴다. §2 에서 확인받지 않았다면 여기서 사용자에게 묻는다.
+
+병행 작업 모드 저장소(`docs_<id>/` 개인 폴더가 있는 경우)의 개인 폴더 문서는 `worker`
+로 분류되어 **제자리에 남는다.** 공용 `docs/` 로 모으고 싶으면 사람이 매핑을 직접
+고친다.
 
 ```
 python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" apply --confirm <저장소 폴더 이름>
 python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" verify
 ```
 
-`apply` 는 이식 전체를 커밋 하나로 묶고 `girok-adopt-before-<날짜>` 태그를 남긴다.
+`apply` 는 `girok-adopt-before-<날짜>` 태그를 남기고, 문서가 옮겨간 자리에 맞춰
+`.claude/girok.json` 의 `board`·`decisionsDir` 을 함께 고친다. **커밋은 하나가 아니다** —
+이미 git 이 있던 저장소에서는 `.gitignore` 정비 커밋이 먼저 생기고 이식 커밋이 뒤에
+온다(사실상 상시 두 개다). 되돌릴 때 커밋 하나만 되돌리면 절반만 되돌아간다.
 `git push` 는 태그를 함께 올리지 않으니 **`git push --tags` 로 따로 올릴 것** — 원격이
 아직 없으면 `git remote add origin <주소>` 뒤 `git push -u origin <브랜치> --tags` 로
 커밋과 태그를 함께 올린다.
@@ -118,10 +142,12 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" verify
 > `verify` 가 통과한 다음 세션에 사람이 볼 때 할 일이다.
 
 > [!NOTE]
-> `verify` 가 증명하는 것은 정해져 있다. 단순 이동 문서는 바이트 단위(sha1)로 원본과
-> 같은지 본다. 병합 문서는 원본의 모든 줄이 결과 안에 (공백 제외하고) 들어있는지만
-> 본다 — 줄 순서가 바뀌거나 같은 줄이 중복돼도 통과한다. 매핑에 오르지 않은 문서(마크
-> 다운이 아니거나 애초에 분류에서 빠진 것)는 검사 범위 밖이다.
+> `verify` 가 증명하는 것은 정해져 있다. 링크가 재작성되지 않은 이동 문서는 바이트
+> 단위(sha1)로 원본과 같은지 본다. **링크가 재작성된 문서는 바이트가 달라지는 것이
+> 정상이다** — 그때는 링크 목적지를 지운 나머지 본문이 백업의 원본과 같은지 대조한다.
+> 병합 문서는 원본의 모든 줄이 결과 안에 (양끝 공백을 뺀 채로) 들어있는지만 본다 — 줄
+> 순서가 바뀌거나 같은 줄이 중복돼도 통과한다. 매핑에 오르지 않은 문서(마크다운이
+> 아니거나 애초에 분류에서 빠진 것)는 검사 범위 밖이다.
 
 이식 과정에서 비밀·대용량 파일이 이미 git 에 커밋돼 있으면 `.gitignore` 를 추가해도
 그 파일은 이력에서 빠지지 않는다는 안내가 뜬다. **이력을 다시 쓰지 않는다** — 비밀이면
@@ -154,8 +180,11 @@ MAJOR 버전이 올랐으면 `migrations/` 에 해당 문서가 있는지 확인
 python "${CLAUDE_PLUGIN_ROOT}/scripts/method_sync.py" verify
 python "${CLAUDE_PLUGIN_ROOT}/scripts/check_docs.py"
 python "${CLAUDE_PLUGIN_ROOT}/scripts/marker_scan.py"
-python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
+python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan --dry-run
 ```
+
+`--dry-run` 은 표만 출력하고 `.claude/girok-adopt.json` 을 건드리지 않는다. 점검에서
+빼면 사람이 채운 `?` 해소와, 이미 이식한 저장소의 추적표가 덮어써진다.
 
 그리고 현황을 한 문단으로 보고한다:
 
@@ -163,7 +192,8 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 - 미push 커밋 (`git status -sb`)
 - 상대 작업자의 새 내용 (`git fetch <remote>` 후 브랜치·스탬프 비교)
 - 검사기·마커 스캔 실패 항목
-- 이식 안 된 문서 (`role` 이 `?` 이거나 제자리가 아닌 항목 수)
+- 이식 안 된 문서 (`role` 이 `?` 이거나 제자리가 아닌 항목 수) — 사람이 "제자리로 확정"
+  한 문서는 매핑에서 `role: "keep"` 이라 여기 세지 않는다
 
 ## 하지 않는 것
 

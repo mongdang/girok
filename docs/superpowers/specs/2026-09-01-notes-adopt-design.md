@@ -64,7 +64,7 @@ notes_adopt.py plan              ← 읽기 전용. .claude/girok-adopt.json 을
       ↓ 모델이 role "?" 를 전부 읽고 채운다 (목적지 + 병합 여부까지)
       ↓ 사람은 결과 표만 확인한다
 notes_adopt.py apply --confirm <저장소명>
-      git 정비 → 첫 커밋 → 태그 → git mv → 병합 → 링크 재작성 → girok.json 갱신
+      git 정비 → 첫 커밋 → 태그 → git mv → 병합 → 링크 재작성 → girok.json 갱신 → 커밋
 notes_adopt.py verify            ← SHA-1 대조 · 병합 원문 줄 검사 · 깨진 링크
 ```
 
@@ -157,11 +157,13 @@ return _config_path(root) is not None or (root / ".git").exists()
 | role | 규칙 | 이동 |
 |---|---|---|
 | `rules` | `CLAUDE.md` `AGENTS.md` `GEMINI.md` | **제자리 고정.** 도구가 루트에서 읽는다 |
-| `foreign` | `docs/superpowers/**` 등 남의 도구 소유 | **제자리.** 옮기면 그쪽이 깨진다 |
+| `foreign` | `docs/superpowers/**`, 그리고 **점(`.`)으로 시작하는 폴더 전부**(`.claude/`·`.github/`) | **제자리.** 옮기면 그쪽이 깨진다 |
 | `board` | `girok.json` 의 board, 또는 `PROGRESS`·`STATE`·`현황` 이름 | 진행기록 폴더의 `PROGRESS.md` |
 | `adr` | `decisionsDir` 안 + `ADR-\d+-` 또는 `\d{3}-` 이름 | 진행기록 폴더의 `docs/decisions/` |
 | `doc` | 나머지 마크다운 | 진행기록 폴더의 `docs/` |
 | `skip` | 비-마크다운, 코드·데이터 | 손대지 않는다 |
+| `worker` | 병행 작업 개인 폴더(`docs_<id>/`) | **제자리.** 개인 폴더 분리를 유지한다 |
+| `keep` | 사람이 읽고 "제자리" 로 확정 | **제자리.** 점검이 다시 묻지 않는다 |
 | `?` | **위 어디에도 확실히 안 걸림** | **`apply` 거부.** 판단 전엔 안 움직인다 |
 
 규칙은 확실히 아는 것만 채우고 애매하면 비운다. `?` 는 모델이 내용을 읽고 채운다 —
@@ -179,9 +181,9 @@ return _config_path(root) is not None or (root / ".git").exists()
 | `experiments/*.jsonl` 등 | `skip` | 손 안 댐 |
 | `THESIS.md` | `?` | 모델 판단 |
 | `decisions/README.md` | `?` | 모델 판단 |
-| `docs/relay-responder-*.md` (2개) | `?` | 모델 판단 |
+| `docs/relay-responder-*.md` (2개) | `doc` | 제자리 (이미 `docs/` 안) |
 
-문서 약 24개 중 규칙이 20개를 처리하고 `?` 4개만 판단으로 남는다.
+문서 약 24개 중 규칙이 22개를 처리하고 `?` 2개만 판단으로 남는다.
 
 ## 4단계 apply
 
@@ -246,19 +248,26 @@ return _config_path(root) is not None or (root / ".git").exists()
 ## 5단계 verify
 
 1. `plan` 에 있던 파일이 전부 새 자리에 있는가
-2. 내용 **SHA-1** 이 같은가
+2. 내용 **SHA-1** 이 이식 직후와 같은가 — 링크가 재작성된 문서는 원본과 바이트가
+   달라지므로, 그 문서는 "링크 목적지 밖의 본문이 백업의 원본과 같은가"로 대조한다
 3. 병합된 원문의 **모든 줄**이 결과 문서에 있는가
 4. 상대 링크 중 깨진 것이 있는가
-5. 백업본과 저장소의 문서 개수가 맞는가
 
-하나라도 어긋나면 복원 명령을 그대로 출력한다.
+하나라도 어긋나면 복원 방법을 그대로 출력한다. 1순위는 **백업 폴더 통째 복원**이다 —
+태그로 옛 경로만 되살리면 이미 옮겨진 새 경로의 사본이 남아 문서가 둘로 갈리고, 다음
+`apply` 가 그 잡파일에 막힌다. 태그로 되돌릴 때는 통째로 되돌린다.
 
 ```
-git checkout girok-adopt-before-20260901 -- .
-# 또는 백업 폴더에서 통째로 되돌린다
+git reset --hard girok-adopt-before-20260901
+git clean -fd
 ```
 
 ## 매핑 파일
+
+`sha1` 은 이식 전 원본, `sha1After` 는 링크 재작성까지 끝난 뒤의 해시다. 둘이 다르면
+`verify` 는 "링크 목적지 밖은 그대로인가"를 백업의 원본과 대조한다. `tag` 는 복원
+안내가 실제로 존재하는 태그를 찍기 위한 것이다 — 날짜로 다시 조립하면 이식 다음 날
+없는 태그를 안내한다.
 
 `.claude/girok-adopt.json` 에 남기고 **커밋한다.** 무엇이 어디로 갔는지가 곧
 추적표이고, 나중에 "그 문서 어디 갔지?"에 답한다.
@@ -266,11 +275,15 @@ git checkout girok-adopt-before-20260901 -- .
 ```json
 {
   "generated": "2026-09-01",
+  "tag": "girok-adopt-before-20260901",
   "gitSetup": { "init": true, "gitignoreAdded": ["__pycache__/"], "secrets": [], "large": [] },
   "backup": { "path": "eq-agent-v3-girok-backup-20260901", "files": 783, "bytes": 4823552 },
+  "configUpdated": { "board": "PROGRESS.md", "decisionsDir": "docs/decisions" },
+  "brokenBefore": [["docs/설계.md", "없는문서.md"]],
   "files": [
     { "from": "STATE.md", "to": "PROGRESS.md", "role": "board",
-      "merge": null, "sha1": "…", "bytes": 4907, "why": "girok.json board" }
+      "merge": null, "sha1": "…", "sha1After": "…", "bytes": 4907,
+      "why": "girok.json board" }
   ]
 }
 ```
