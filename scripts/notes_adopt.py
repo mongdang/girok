@@ -411,8 +411,16 @@ def _porcelain(root: Path) -> dict[str, str]:
     still names the old path — only recording the new one would let that
     file slip past the gate and die later, inside `move_all`, on a git
     error nobody can read.
+
+    `--untracked-files=all` asks git to list files inside a never-tracked
+    directory individually. Without it git folds the whole directory into
+    one `?? dir/` line, so a planned document living inside it has no entry
+    here at all and reads as clean.
     """
-    result = run_git(root, "-c", "core.quotepath=false", "status", "--porcelain")
+    result = run_git(
+        root, "-c", "core.quotepath=false",
+        "status", "--porcelain", "--untracked-files=all",
+    )
     states = {}
     for line in result.stdout.splitlines():
         if len(line) < 4:

@@ -5,8 +5,6 @@ build artifact nobody tracks is fine. What matters is that every file about
 to move is committed, because the restore tag can only hold what was
 committed.
 """
-import json
-
 import notes_adopt
 import pytest
 
@@ -76,6 +74,22 @@ def test_an_untracked_file_inside_the_plan_blocks(repo):
         notes_adopt.check_preconditions(repo, mapping)
 
     assert "새문서.md" in str(excinfo.value)
+
+
+def test_an_untracked_file_inside_a_new_directory_blocks(repo):
+    # Git folds a never-tracked directory into one `?? newdir/` line unless
+    # asked to list it in full — a planned document inside it must still
+    # be caught, not hidden behind the folded line.
+    write(repo / "newdir" / "doc.md", "# 새\n")
+    mapping = _mapping([
+        {"from": "newdir/doc.md", "to": "docs/doc.md", "role": "doc", "merge": None,
+         "sha1": "x", "bytes": 1, "why": ""},
+    ])
+
+    with pytest.raises(notes_adopt.Blocked) as excinfo:
+        notes_adopt.check_preconditions(repo, mapping)
+
+    assert "newdir/doc.md" in str(excinfo.value)
 
 
 def test_a_merge_in_progress_blocks(repo):
