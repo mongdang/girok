@@ -1,0 +1,79 @@
+name: release
+
+# A release used to be made by hand, and three versions in a row went out
+# without one — the repository page said 0.16.0 while 0.18.1 was installed.
+# The version in plugin.json is the thing that must be bumped per release
+# (clients cache under it), so that bump is the signal to release on.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".claude-plugin/plugin.json"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: read the version
+        id: version
+        run: |
+          version=$(python -c "import json,pathlib;print(json.loads(pathlib.Path('.claude-plugin/plugin.json').read_text(encoding='utf-8'))['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=girok--v$version" >> "$GITHUB_OUTPUT"
+
+      # A push touching plugin.json is not always a version bump — a
+      # description or keyword edit lands here too. Releasing again on the
+      # same version would fail the create step, so it stops quietly instead.
+      - name: skip when this version is already released
+        id: check
+        run: |
+          if git rev-parse -q --verify "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null \
+             || gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "이미 릴리스된 판본이다 — ${{ steps.version.outputs.tag }}"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # The changelog entry is the release body. A version with no entry is a
+      # release nobody can read, so it fails here rather than publishing an
+      # empty one.
+      - name: cut the changelog entry
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          python - <<'PY'
+          import json, pathlib, re, sys
+
+          manifest = pathlib.Path(".claude-plugin/plugin.json").read_text(encoding="utf-8")
+          version = json.loads(manifest)["version"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          for section in re.split(r"^## ", text, flags=re.M)[1:]:
+              if section.split("\n", 1)[0].split(" ")[0].strip() == version:
+                  pathlib.Path("release-notes.md").write_text(
+                      "## " + section.rstrip() + "\n", encoding="utf-8"
+                  )
+                  break
+          else:
+              sys.exit(f"CHANGELOG.md 에 {version} 절이 없다 — 릴리스 본문이 될 내용이 없다")
+          PY
+
+      - name: tag and release
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --target "${{ github.sha }}" \
+            --title "girok v${{ steps.version.outputs.version }}" \
+            --notes-file release-notes.md \
+            --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
