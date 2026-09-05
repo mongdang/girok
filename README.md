@@ -72,6 +72,7 @@ flowchart TD
         MR["RULES.md<br/>규칙 전문"]
         MV["VERSION<br/>판본 · 내용 해시"]
         ML["scripts/<br/>검사기 사본"]
+        MH["hooks/<br/>훅 사본"]
     end
 
     subgraph R["③ 저장소 — 이 프로젝트의 사실"]
@@ -88,7 +89,7 @@ flowchart TD
     classDef method fill:#E0A458,stroke:#b8863f,color:#1a1a1a
     classDef repo fill:#6B7280,stroke:#4b5563,color:#fff
     class PS,PH,PL plugin
-    class MR,MV,ML method
+    class MR,MV,ML,MH method
     class RB,RD,RG repo
 ```
 
@@ -97,6 +98,7 @@ flowchart TD
 | | |
 |---|---|
 | **clone만 해도 규칙이 보인다** | `.method/RULES.md` 를 읽는 데 플러그인이 필요 없다. Gemini CLI·Codex 도 같은 파일을 읽는다 |
+| **플러그인 없이도 검사가 돈다** | 훅은 저장소의 `.claude/settings.json` 이 등록한다. 플러그인은 도입·갱신에만 있으면 된다 |
 | **커밋 이력에 판본이 남는다** | `.method/VERSION` 이 그 규칙이 적용된 작업과 같이 커밋된다 |
 | **어긋나면 보인다** | 세션 시작 시 스냅샷과 설치된 플러그인 판본을 대조해 알려준다 |
 | **CI가 강제한다** | 스냅샷은 VERSION이 가리키는 판본의 산출물과 **바이트 동일**해야 한다 |
@@ -107,7 +109,7 @@ flowchart TD
 
 ## 빠른 시작
 
-### 1단계 · 플러그인 설치 (머신당 1회)
+### 1단계 · 플러그인 설치 (도입·갱신용, 머신당 1회)
 
 ```bash
 claude plugin marketplace add mongdang/girok
@@ -116,6 +118,12 @@ claude plugin install girok@mongdang
 
 Claude Code 안에서라면 `/plugin marketplace add mongdang/girok` → `/plugin install girok@mongdang`.
 설치 후 **Claude Code 를 껐다 켠다** — 훅은 세션이 시작할 때 붙는다.
+
+> [!TIP]
+> **이미 girok 이 들어간 저장소에서 작업만 할 거라면 이 단계는 필요 없다.** 훅·검사기·규칙
+> 전문이 저장소에 함께 커밋돼 있고, 훅 등록도 저장소의 `.claude/settings.json` 에 있다.
+> 폴더 신뢰를 승인하고 Python 3.10+ 만 있으면 같은 검사가 그대로 돈다. 플러그인이 필요한
+> 것은 **저장소를 새로 도입할 때(2단계)와 규칙 개정을 내려받을 때** 다.
 
 > [!NOTE]
 > 폴더를 신뢰하면 저장소에 커밋된 설정에서 마켓플레이스가 자동 등록된다. 다만 커밋된
@@ -155,8 +163,9 @@ Claude Code 안에서라면 `/plugin marketplace add mongdang/girok` → `/plugi
   <img src="docs/images/init.svg" alt="초기화 결과 — 없던 것만 만들고 있던 파일은 유지한다" width="720">
 </p>
 
-만들어진 결과는 **커밋한다.** 특히 `.claude/settings.json` 이 커밋돼야 팀원이 플러그인
-선언을 받는다.
+만들어진 결과는 **커밋한다.** 특히 `.claude/settings.json` 이 커밋돼야 **팀원의 머신에서
+훅이 걸린다** — 훅 등록이 그 파일에 들어 있고, 그래서 플러그인이 없는 사람에게도 같은
+검사가 적용된다.
 
 ### 3단계 · 작업
 
@@ -245,7 +254,7 @@ python <진행기록폴더>/.method/scripts/method_sync.py verify
 </p>
 
 바로 쓸 수 있는 워크플로가 [`ci/github-actions.yml`](ci/github-actions.yml) 에 있다.
-훅은 빠른 피드백, **CI가 보증**이다 — 플러그인이 없는 사람, 다른 에이전트, 웹 UI 편집은
+훅은 빠른 피드백, **CI가 보증**이다 — Python 이 없는 머신, 다른 에이전트, 웹 UI 편집은
 훅을 그냥 통과하기 때문이다.
 
 ## 무엇을 막고 무엇을 경고하나
@@ -404,7 +413,11 @@ GIROK_FORCE_PUSH_REASON="이력 리셋 — 사용자 지시 2026-09-01" git push
 
 ## 요구사항
 
-**Python 3.10 이상**과 **git**. 이 둘이 전부다.
+**Python 3.10 이상**과 **git**. 이 둘이 전부다. 플러그인은 도입·갱신에만 필요하다.
+
+Python 이 없는 머신에서는 훅이 돌지 않는다. 래퍼가 그 사실을 stderr 로 말하고 끝내며,
+세션 시작 블록이 뜨지 않으므로 `CLAUDE.md` 게이트가 작업을 멈춘다. 그 환경에 남는 것은
+규칙 전문(사람이 읽고 따르는 것)과 CI(사후 거부)뿐이다 — 사전 차단은 없다.
 
 훅도 검사기도 전부 Python 이고, 진입점은 bash·cmd.exe·PowerShell 셋 다에서 도는 폴리글롯
 래퍼다 — Git Bash 가 없는 Windows 에서 Claude Code 가 PowerShell 로 훅을 띄우는 경우까지

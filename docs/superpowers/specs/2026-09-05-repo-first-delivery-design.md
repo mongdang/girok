@@ -1,6 +1,6 @@
 # 저장소 우선 전달 — 플러그인 없이도 도는 훅 설계
 
-> 상태: 설계 승인됨 · 구현 전
+> 상태: 구현 완료 · v0.19.0
 > 날짜: 2026-09-05
 
 ## 목차
@@ -137,14 +137,16 @@ ready 마커가 스냅샷 판본을 말하게 되는 것은 부수 효과가 아
 
 ## 3 저장소 settings.json 에 등록한다
 
-`templates/settings.json` 에 훅 다섯을 넣는다. 명령 문자열은 플러그인 루트 대신
+훅 다섯의 등록 블록은 `method_sync` 가 만든다. 명령 문자열은 플러그인 루트 대신
 프로젝트 루트를 가리킨다.
 
 ```
-"${{CLAUDE_PROJECT_DIR}}/{notesPrefix}.method/hooks/run-hook.cmd" session-start
+"${CLAUDE_PROJECT_DIR}/<notesPrefix>.method/hooks/run-hook.cmd" session-start
 ```
 
-`notesPrefix` 는 `notes_init` 이 이미 계산해 두는 값이다(`notesDir` 이 `"."` 이면 빈
+템플릿이 아니라 코드인 이유는 하나다. `templates/settings.json` 은 `str.format` 을
+거치므로 JSON 의 중괄호를 전부 이중으로 써야 하고, 훅 블록을 그렇게 쓰면 아무도 읽거나
+고칠 수 없는 파일이 된다. `notesPrefix` 는 `notesDir` 에서 계산한다(`"."` 이면 빈
 문자열, `"notes"` 면 `"notes/"`). matcher 와 timeout 은 현행 `hooks/hooks.json` 을
 그대로 옮긴다.
 
@@ -161,15 +163,16 @@ ready 마커가 스냅샷 판본을 말하게 되는 것은 부수 효과가 아
 그래서 병합 함수를 하나 만든다.
 
 ```python
-notes_init.sync_settings(root: Path, notes_prefix: str) -> bool
+method_sync.sync_settings(root: Path, prefix: str, plugin_root: Path) -> bool
 ```
 
 기존 JSON 을 읽어 `hooks` 키만 갈아끼우고 나머지 키는 그대로 둔다. 파일이 없으면
-템플릿 전체를 쓴다. 바뀐 것이 있으면 참을 돌려준다. `init()` 에서도 이 함수를 쓴다 —
-`_write` 로 건너뛰던 자리를 대체한다.
+템플릿 전체를 쓴다. 바뀐 것이 있으면 참을 돌려준다.
 
-호출 시점은 `method_sync.sync()` 직후다. `/notes` 의 초기화 절과 sync 절 양쪽에서
-훅 등록이 함께 따라온다.
+호출 시점은 `sync()` **안**이다. 스냅샷을 쓰는 일과 그 훅을 등록하는 일을 둘로 나누면
+훅은 커밋되어 있는데 아무도 등록하지 않은 저장소가 생길 수 있고, 그 상태는 정상과
+겉모습이 같다. 한 함수 안에 두면 그 중간 상태 자체가 없다. `/notes` 의 초기화 절과
+sync 절이 모두 `sync()` 를 거치므로 양쪽에서 등록이 함께 따라온다.
 
 전환 절차는 이 저장소의 기존 규칙 배포 경로와 같다 — `CONTRIBUTING.md` 가 이미
 "판본을 올린다 → push → 각 저장소에서 `/notes`" 로 정해 두었다. 이 판본으로 올린
@@ -224,11 +227,13 @@ notes_init.sync_settings(root: Path, notes_prefix: str) -> bool
 | 훅이 스냅샷에 안 들어간다 | `test_sync_writes_the_hooks_too` |
 | 훅을 고쳤는데 해시가 그대로다 | `test_editing_a_hook_changes_the_snapshot_hash` |
 | 훅이 지워졌는데 verify 가 통과한다 | `test_verify_fails_when_a_hook_is_deleted` |
-| 플러그인 없이 세션 시작이 죽는다 | `test_session_start_reports_without_the_plugin` |
+| 플러그인 없이 세션 시작이 죽는다 | `test_the_ready_marker_survives_a_missing_plugin` |
 | 스냅샷 훅이 플러그인 없이 안 돈다 | `test_the_snapshot_hooks_run_without_the_plugin` |
 | 훅 등록이 기존 설정을 날린다 | `test_settings_sync_keeps_what_was_already_there` |
 | 등록이 지워졌는데 verify 가 통과한다 | `test_verify_fails_when_the_hooks_are_not_registered` |
-| Unix 에서 wrapper 가 실행 권한 없이 놓인다 | `test_the_wrapper_is_executable_in_the_snapshot` |
+| 등록이 엉뚱한 경로를 가리킨다 | `test_verify_fails_when_a_registration_points_somewhere_else` |
+| 저장소가 자기 훅을 더 넣었다고 실패한다 | `test_a_repository_may_register_hooks_of_its_own` |
+| wrapper 가 실행 권한 없이 커밋된다 | `test_the_wrapper_is_committed_executable` |
 
 ## 별도 안건
 
