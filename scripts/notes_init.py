@@ -324,7 +324,10 @@ def main(argv: list[str] | None = None) -> int:
         "updated": len(result.updated),
         "kept": len(result.skipped),
     }))
-    return 0
+    # The skeleton can land while the hooks fail to register. Reported as a
+    # success, a script that chains on the exit code carries on into a
+    # repository where nothing is checking anything.
+    return 1 if result.problems else 0
 
 
 if __name__ == "__main__":

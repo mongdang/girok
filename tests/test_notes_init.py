@@ -409,3 +409,17 @@ def test_the_gate_says_how_to_get_the_checks_back(empty_repo):
 
     assert "/notes" in text
     assert "플러그인 설치" not in text
+
+
+def test_it_exits_nonzero_when_the_hooks_could_not_be_registered(empty_repo, capsys):
+    """The skeleton lands, the hooks never register, and the run reads as a
+    clean success -- so a script that chains on the exit code carries on into
+    a repository where nothing is checking anything."""
+    settings = empty_repo / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_text("{ 이건 JSON 이 아니다", encoding="utf-8")
+
+    code = notes_init.main(["--root", str(empty_repo), "--confirm", "fresh"])
+
+    assert "[실패]" in capsys.readouterr().out
+    assert code == 1

@@ -342,8 +342,15 @@ def _is_ours(entry: dict) -> bool:
     Matched on the wrapper's tail rather than the full path so that an entry
     left by an earlier layout -- a different notesDir, a renamed folder --
     is recognized and replaced instead of accumulating beside the new one.
+
+    Read at a path boundary, the same way verify reads it. As a plain
+    substring it also claimed a hook that merely passes the path as an
+    argument, and sync deleted somebody else's entry as our own leftovers.
     """
-    return any(WRAPPER_TAIL in hook.get("command", "") for hook in entry.get("hooks", []))
+    return any(
+        _runs_our_wrapper(hook.get("command", ""), WRAPPER_TAIL)
+        for hook in entry.get("hooks", [])
+    )
 
 
 def _runs_our_wrapper(command: str, wrapper: str) -> bool:
@@ -484,6 +491,11 @@ def method_dir(cfg: notes_config.NotesConfig) -> Path:
     return cfg.notes_dir / ".method"
 
 
+def _is_content_hash(value: str) -> bool:
+    """Whether a stamp's last field is one of our content hashes."""
+    return len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
 def _looks_like_ours(stamp: str) -> bool:
     """Whether a VERSION stamp was written by this plugin, current or renamed."""
     if "girok" in stamp:
@@ -492,9 +504,7 @@ def _looks_like_ours(stamp: str) -> bool:
         parsed = parse_version(stamp)
     except (ValueError, IndexError):
         return False
-    return len(parsed.content_hash) == 64 and all(
-        c in "0123456789abcdef" for c in parsed.content_hash
-    )
+    return _is_content_hash(parsed.content_hash)
 
 
 def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult:
@@ -539,35 +549,49 @@ def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult
                 rel = path.relative_to(target).as_posix()
                 if rel not in expected:
                     result.removed.append(rel)
-        shutil.rmtree(target)
 
-    (target / "scripts").mkdir(parents=True, exist_ok=True)
-    (target / "hooks").mkdir(parents=True, exist_ok=True)
-    (target / ".gitignore").write_text(GITIGNORE, encoding="utf-8", newline="\n")
-    (target / "RULES.md").write_text(build_rules(plugin_root), encoding="utf-8", newline="\n")
+    # Built beside the snapshot and swapped in once it is whole. Written in
+    # place, a failure partway -- a full disk, a file held open -- left a
+    # half-built `.method/` that the next run refuses to touch, and the
+    # repository sat unsupervised until someone deleted it by hand.
+    staging = target.parent / (target.name + ".tmp")
+    if staging.exists():
+        shutil.rmtree(staging)
+
+    (staging / "scripts").mkdir(parents=True, exist_ok=True)
+    (staging / "hooks").mkdir(parents=True, exist_ok=True)
+    (staging / ".gitignore").write_text(GITIGNORE, encoding="utf-8", newline="\n")
+    (staging / "RULES.md").write_text(build_rules(plugin_root), encoding="utf-8", newline="\n")
     result.written.extend(["RULES.md", ".gitignore"])
     for name in SNAPSHOT_SCRIPTS:
         source = plugin_root / "scripts" / name
         if source.is_file():
-            shutil.copyfile(source, target / "scripts" / name)
+            shutil.copyfile(source, staging / "scripts" / name)
             result.written.append(f"scripts/{name}")
     for name in SNAPSHOT_HOOKS:
         source = plugin_root / "hooks" / name
         if source.is_file():
-            copy = target / "hooks" / name
-            shutil.copyfile(source, copy)
-            if name == EXECUTABLE_IN_SNAPSHOT:
-                _make_executable(copy, cfg.repo_root)
+            shutil.copyfile(source, staging / "hooks" / name)
             result.written.append(f"hooks/{name}")
 
     version = Version(
         plugin_version=plugin_version(plugin_root),
         date=date.today().isoformat(),
         commit=_plugin_commit(plugin_root),
-        content_hash=_content_hash(target),
+        content_hash=_content_hash(staging),
     )
-    (target / "VERSION").write_text(version.render(), encoding="utf-8", newline="\n")
+    (staging / "VERSION").write_text(version.render(), encoding="utf-8", newline="\n")
+
+    if target.exists():
+        shutil.rmtree(target)
+    staging.replace(target)
     result.version = version
+
+    # After the swap, not before: the index entry has to name where the
+    # wrapper ends up, not the folder it was built in.
+    wrapper = target / "hooks" / EXECUTABLE_IN_SNAPSHOT
+    if wrapper.is_file():
+        _make_executable(wrapper, cfg.repo_root)
 
     # Registration belongs with the copy. Split in two, a repository could
     # sit with the hooks committed and nothing registering them.
@@ -664,9 +688,11 @@ def status(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> Status:
         # A stamp without our 64-hex content hash is not a version we wrote.
         # Taking the last word of whatever the file holds announced
         # `ready vdata` for a VERSION reading "corrupt data" -- the gate
-        # accepted a snapshot nobody had checked.
+        # accepted a snapshot nobody had checked. Measured the same way sync
+        # measures it: length alone left 64 characters of anything as a
+        # snapshot to the gate and a foreign folder to sync.
         parsed = parse_version(stamp)
-        if len(parsed.content_hash) == 64:
+        if _is_content_hash(parsed.content_hash):
             snapshot = parsed.plugin_version or None
     return Status(snapshot_version=snapshot, plugin_version=plugin_version(plugin_root))
 

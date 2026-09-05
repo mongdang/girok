@@ -500,3 +500,62 @@ def test_a_broken_settings_file_is_reported_not_silently_kept(notes_repo):
 
     assert result.settings_problem
     assert "settings.json" in result.settings_problem
+
+
+def test_settings_sync_keeps_a_hook_that_only_names_the_wrapper(notes_repo):
+    """Recognizing our own entry matched the wrapper anywhere in the command
+    while verify matched it at a path boundary. A hook that passes the path
+    as an argument -- rather than running it -- read as girok leftovers and
+    was deleted."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["Stop"].append(
+        {"hooks": [{"type": "command", "command": "python tools/audit.py --skip .method/hooks/run-hook.cmd"}]}
+    )
+    settings.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    method_sync.sync_settings(notes_repo, "notes/")
+
+    after = json.loads(settings.read_text(encoding="utf-8"))
+    commands = [h.get("command", "") for e in after["hooks"]["Stop"] for h in e.get("hooks", [])]
+    assert any("tools/audit.py" in c for c in commands), commands
+    assert method_sync.verify(notes_repo).ok
+
+
+def test_a_version_hash_that_is_not_a_hash_is_not_read_as_a_version(notes_repo):
+    """status measured the hash's length and sync also measured its
+    characters, so a stamp carrying 64 non-hex characters was a snapshot to
+    the gate and a foreign folder to sync. The gate announced it ready."""
+    method_sync.sync(notes_repo)
+    version = notes_repo / "notes" / ".method" / "VERSION"
+    version.write_text("other v1.2.3 / 2026-01-01 / abc1234 / " + "z" * 64 + "\n", encoding="utf-8")
+
+    assert method_sync.status(notes_repo).snapshot_version is None
+
+
+def test_a_sync_that_fails_partway_leaves_the_snapshot_it_had(notes_repo, monkeypatch):
+    """sync deleted the folder and then wrote twenty files into it. A failure
+    in between left a half-built snapshot that the next run refuses to touch,
+    so the repository sits unsupervised until someone deletes it by hand."""
+    method_sync.sync(notes_repo)
+    method = notes_repo / "notes" / ".method"
+    before = sorted(p.relative_to(method).as_posix() for p in method.rglob("*") if p.is_file())
+
+    real = method_sync.shutil.copyfile
+    copied = []
+
+    def fails_once_it_is_underway(src, dst, *args, **kwargs):
+        copied.append(dst)
+        if len(copied) > 3:
+            raise OSError("디스크가 가득 찼다")
+        return real(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(method_sync.shutil, "copyfile", fails_once_it_is_underway)
+
+    with pytest.raises(OSError):
+        method_sync.sync(notes_repo)
+
+    after = sorted(p.relative_to(method).as_posix() for p in method.rglob("*") if p.is_file())
+    assert after == before
+    assert method_sync.verify(notes_repo).ok
