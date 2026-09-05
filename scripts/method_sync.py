@@ -116,16 +116,30 @@ class VerifyResult:
 @dataclass
 class Status:
     snapshot_version: str | None
-    plugin_version: str
+    plugin_version: str | None
 
     @property
     def in_sync(self) -> bool:
-        return self.snapshot_version == self.plugin_version
+        return (
+            self.snapshot_version is not None
+            and self.plugin_version is not None
+            and self.snapshot_version == self.plugin_version
+        )
 
 
-def plugin_version(plugin_root: Path = PLUGIN_ROOT) -> str:
+def plugin_version(plugin_root: Path = PLUGIN_ROOT) -> str | None:
+    """The installed plugin's version, or None where it is not installed.
+
+    The snapshot carries the hooks now, so sessions run on machines with no
+    plugin at all. Raising here took the whole session-start report down with
+    it: a repository that was fully set up reported nothing, and the readiness
+    marker it owes the CLAUDE.md gate never appeared.
+    """
     manifest = plugin_root / ".claude-plugin" / "plugin.json"
-    return json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    try:
+        return json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    except (OSError, KeyError, json.JSONDecodeError):
+        return None
 
 
 def _plugin_commit(plugin_root: Path) -> str:
@@ -390,6 +404,11 @@ def main(argv: list[str] | None = None) -> int:
     if state.snapshot_version is None:
         print("[경고] .method/ 스냅샷 없음 — `/notes` 로 초기화할 것")
         return 1
+    # Having nothing to compare against is not the same as disagreeing. On a
+    # machine without the plugin the snapshot is the only authority there is.
+    if state.plugin_version is None:
+        print(f"스냅샷 v{state.snapshot_version} — 플러그인이 없어 대조는 건너뛴다")
+        return 0
     if not state.in_sync:
         print(
             f"[경고] 스냅샷 v{state.snapshot_version} vs 플러그인 v{state.plugin_version} — "

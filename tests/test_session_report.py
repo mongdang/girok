@@ -159,3 +159,16 @@ def test_the_report_is_short(notes_repo):
     report = build(notes_repo, git_email="abc@example.invalid")
 
     assert len(report.text.encode("utf-8")) < 2000
+
+
+def test_the_ready_marker_survives_a_missing_plugin(notes_repo, tmp_path):
+    """The marker says the rules are in this repository, not that a plugin is
+    on this machine. Reading it off the installed plugin made a fully set up
+    repository look unsupervised the moment the plugin was absent."""
+    method_sync.sync(notes_repo)
+
+    report = build(notes_repo, plugin_root=tmp_path / "no-plugin-here")
+
+    assert report.ready
+    assert "[girok] ready v" in report.text
+    assert "낡았을 수 있다" not in report.text

@@ -123,8 +123,11 @@ def build(
         return report
 
     report.ready = True
-    report.lines.append(f"[girok] ready v{state.plugin_version}")
-    if not state.in_sync:
+    # The marker says the rules are in this repository, not that a plugin is
+    # installed on this machine -- the snapshot is what carries them, and it
+    # is what a machine without the plugin still has.
+    report.lines.append(f"[girok] ready v{state.snapshot_version}")
+    if state.plugin_version is not None and not state.in_sync:
         report.lines.append(
             f"[주의] 스냅샷 v{state.snapshot_version} ≠ 플러그인 v{state.plugin_version} — "
             f"규칙이 낡았을 수 있다. `/notes` 로 sync 할 것"

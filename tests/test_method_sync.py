@@ -192,3 +192,16 @@ def test_sync_still_recognizes_a_pre_rename_snapshot(notes_repo):
 
     assert result.version is not None
     assert method_sync.verify(notes_repo).ok
+
+
+def test_status_does_not_die_when_the_plugin_is_not_installed(notes_repo, tmp_path):
+    """The snapshot carries the hooks now, so a session runs on machines with
+    no plugin at all. Raising here took the whole session-start report down
+    with it — a repository that was fully set up reported nothing."""
+    method_sync.sync(notes_repo)
+
+    state = method_sync.status(notes_repo, tmp_path / "no-plugin-here")
+
+    assert state.plugin_version is None
+    assert state.snapshot_version is not None
+    assert not state.in_sync
