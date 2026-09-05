@@ -110,3 +110,17 @@ def test_the_no_python_message_is_ascii(tmp_path):
 def test_the_wrapper_has_no_carriage_returns():
     """bash reads the unix half; a \\r would end up in every command."""
     assert b"\r" not in WRAPPER.read_bytes()
+
+
+def test_the_wrapper_is_committed_executable():
+    """The same failure as in the snapshot, one layer up. A plugin installed
+    on Linux gets this file out of git, and git is where the execute bit
+    lives — without it bash refuses to run the wrapper and every hook is
+    silently dead on that machine."""
+    listed = subprocess.run(
+        ["git", "ls-files", "-s", "hooks/run-hook.cmd"],
+        cwd=Path(__file__).resolve().parent.parent,
+        capture_output=True, text=True,
+    ).stdout
+
+    assert listed.startswith("100755"), listed or "(인덱스에 없다)"

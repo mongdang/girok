@@ -173,6 +173,11 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" verify
 python "${CLAUDE_PLUGIN_ROOT}/scripts/method_sync.py" sync
 ```
 
+sync 는 `.method/` 를 다시 쓰면서 `.claude/settings.json` 의 훅 등록도 함께 맞춘다.
+**바뀌었으면 그 파일도 같이 커밋한다** — 등록이 커밋되지 않으면 다른 머신에서는 훅이
+걸리지 않고, 그 상태는 정상과 겉모습이 같다. 기존 `permissions`·마켓플레이스 항목은
+건드리지 않고 `hooks` 키만 갈아끼운다.
+
 `.method/` 는 사람이 손대지 않는 폴더다. 사람이 고친 흔적이 있으면 `[제거]` 로 보고되며,
 그 사실을 사용자에게 알린다 — 그 편집은 사라진다.
 

@@ -47,6 +47,8 @@ GATE_END = "<!-- safety-gate:end -->"
 class InitResult:
     created: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    updated: list[str] = field(default_factory=list)
+    problems: list[str] = field(default_factory=list)
 
 
 def _template(name: str) -> str:
@@ -167,7 +169,6 @@ def init(
             data["mergeOwner"] = worker
             rendered = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
         _write(root / ".claude" / "girok.json", rendered, result, root)
-    _write(root / ".claude" / "settings.json", _template("settings.json").format(), result, root)
 
     pointer = _template("CLAUDE.md.pointer").format(**fields)
     pointer = _keep_gate_section(pointer) if safety_gate else _strip_gate_section(pointer)
@@ -217,8 +218,23 @@ def init(
     if worker and parallel_mode:
         _init_worker(notes, worker, fields, result, root)
 
-    method_sync.sync(root, plugin_root)
+    # sync writes the snapshot and registers its hooks in one step. Split in
+    # two, a repository could sit with the hooks committed and nothing
+    # registering them -- rules present, nothing enforcing, no sign of it.
+    settings = root / ".claude" / "settings.json"
+    existed = settings.is_file()
+    sync_result = method_sync.sync(root, plugin_root)
     result.created.append(f"{notes_dir}/.method/")
+
+    rel = ".claude/settings.json"
+    if sync_result.settings_problem:
+        result.problems.append(sync_result.settings_problem)
+    elif not sync_result.settings_changed:
+        result.skipped.append(rel)
+    elif existed:
+        result.updated.append(rel)
+    else:
+        result.created.append(rel)
     return result
 
 
@@ -297,10 +313,21 @@ def main(argv: list[str] | None = None) -> int:
 
     for rel in result.created:
         print(f"[생성] {rel}")
+    for rel in result.updated:
+        print(f"[갱신] {rel}")
     for rel in result.skipped:
         print(f"[유지] {rel} — 이미 있어서 건드리지 않음")
-    print(json.dumps({"created": len(result.created), "kept": len(result.skipped)}))
-    return 0
+    for problem in result.problems:
+        print(f"[실패] {problem}")
+    print(json.dumps({
+        "created": len(result.created),
+        "updated": len(result.updated),
+        "kept": len(result.skipped),
+    }))
+    # The skeleton can land while the hooks fail to register. Reported as a
+    # success, a script that chains on the exit code carries on into a
+    # repository where nothing is checking anything.
+    return 1 if result.problems else 0
 
 
 if __name__ == "__main__":

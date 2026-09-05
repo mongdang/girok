@@ -6,6 +6,7 @@ ignored rather than rejected — a check nobody can see failing is worse than
 no check, since everyone believes it is running.
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -17,13 +18,24 @@ from conftest import write
 HOOKS = Path(__file__).resolve().parent.parent / "hooks"
 
 
-def run_hook(name: str, payload: dict) -> tuple[int, dict | None, str]:
+def run_hook(
+    name: str,
+    payload: dict,
+    hooks_dir: Path = HOOKS,
+    env: dict | None = None,
+) -> tuple[int, dict | None, str]:
+    """Run a hook the way Claude Code does.
+
+    `hooks_dir` exists so the same checks can be pointed at the committed
+    copies in .method/hooks/ — the ones a machine without the plugin runs.
+    """
     proc = subprocess.run(
-        [sys.executable, str(HOOKS / f"{name}.py")],
+        [sys.executable, str(hooks_dir / f"{name}.py")],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
         encoding="utf-8",
+        env=env,
     )
     out = proc.stdout.strip()
     parsed = None
@@ -256,3 +268,135 @@ def test_post_tool_use_does_not_claim_a_failed_push_succeeded(ready_repo):
     )
 
     assert "실패" in out["hookSpecificOutput"]["additionalContext"]
+
+
+# The payload each hook needs to do something observable, so that "it ran"
+# means the check ran and not merely that the process started.
+SNAPSHOT_PAYLOADS = {
+    "session-start": lambda root: {
+        "hook_event_name": "SessionStart", "cwd": str(root), "startup_type": "startup",
+    },
+    "user-prompt-submit": lambda root: {
+        "hook_event_name": "UserPromptSubmit", "cwd": str(root), "prompt": "원점복귀 돌려줘",
+    },
+    "pre-tool-use": lambda root: {
+        "hook_event_name": "PreToolUse", "cwd": str(root),
+        "tool_name": "Bash", "tool_input": {"command": "git push --force origin main"},
+    },
+    "post-tool-use": lambda root: {
+        "hook_event_name": "PostToolUse", "cwd": str(root),
+        "tool_name": "Bash", "tool_input": {"command": "git push origin abc"},
+        "tool_response": "Everything up-to-date",
+    },
+    "stop": lambda root: {"hook_event_name": "Stop", "cwd": str(root)},
+}
+
+
+def without_the_plugin(tmp_path):
+    """The environment of a machine that never installed girok.
+
+    PYTHONPATH goes too: pytest puts the plugin's own hooks/ and scripts/ on
+    the path, and inheriting that would let the snapshot copy import the
+    plugin's modules — the test would pass for the wrong reason.
+    """
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["CLAUDE_PLUGIN_ROOT"] = str(tmp_path / "no-plugin-here")
+    return env
+
+
+@pytest.mark.parametrize("name", sorted(SNAPSHOT_PAYLOADS))
+def test_the_snapshot_hooks_run_without_the_plugin(ready_repo, tmp_path, name):
+    """A machine with no plugin runs the copies in .method/hooks/. If those
+    cannot import what they need, the repository is unsupervised and nothing
+    says so."""
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    code, _, err = run_hook(
+        name, SNAPSHOT_PAYLOADS[name](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert code == 0, err
+    assert "Traceback" not in err, err
+
+
+def test_the_snapshot_session_start_still_emits_the_ready_marker(ready_repo, tmp_path):
+    """The CLAUDE.md gate keys off this marker. Losing it on a machine that
+    has the rules and runs every check would stop work for no reason."""
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, out, err = run_hook(
+        "session-start", SNAPSHOT_PAYLOADS["session-start"](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert out is not None, err
+    assert "[girok] ready" in out["hookSpecificOutput"]["additionalContext"]
+
+
+def test_the_snapshot_pre_tool_use_still_blocks(ready_repo, tmp_path):
+    """Blocking is the one thing a rule document cannot do. If it does not
+    survive the move into the snapshot, the whole plugin-free story is advice
+    rather than enforcement."""
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, out, err = run_hook(
+        "pre-tool-use", SNAPSHOT_PAYLOADS["pre-tool-use"](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert out is not None, err
+    assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_the_snapshot_user_prompt_submit_still_raises_the_gate(ready_repo, tmp_path):
+    """Exit code 0 only says the process lived. What matters is that the open
+    gate item reached the session."""
+    write(
+        ready_repo / "notes" / "docs" / "SAFETY_GATE.md",
+        "# 게이트\n\n| # | 항목 | 상태 |\n|---|---|---|\n| 1 | 정위치 | OPEN |\n",
+    )
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, out, err = run_hook(
+        "user-prompt-submit", SNAPSHOT_PAYLOADS["user-prompt-submit"](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert out is not None, err
+    assert "OPEN 1건" in out["hookSpecificOutput"]["additionalContext"]
+
+
+def test_the_snapshot_post_tool_use_still_checks_the_document(ready_repo, tmp_path):
+    board = write(
+        ready_repo / "notes" / "docs" / "PROGRESS.md",
+        "# 현황판\n\n---\n\n## 목차\n\n- [없음](#없음)\n\n---\n\n## 있음\n\n내용\n",
+    )
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, out, err = run_hook(
+        "post-tool-use",
+        {
+            "hook_event_name": "PostToolUse", "cwd": str(ready_repo),
+            "tool_name": "Edit", "tool_input": {"file_path": str(board)},
+        },
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert out is not None, err
+    assert "없음" in out["hookSpecificOutput"]["additionalContext"]
+
+
+def test_the_snapshot_stop_still_reports_to_stderr(ready_repo, tmp_path):
+    write(
+        ready_repo / "notes" / "docs" / "PROGRESS.md",
+        "# 현황판\n\n---\n\n## 목차\n\n- [없음](#없음)\n\n---\n\n## 있음\n\n내용\n",
+    )
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, _, err = run_hook(
+        "stop", SNAPSHOT_PAYLOADS["stop"](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert "girok" in err

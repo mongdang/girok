@@ -368,3 +368,58 @@ def test_no_worker_folder_when_parallel_work_is_off(empty_repo):
 
     assert not (empty_repo / "notes" / "docs_abc").exists()
     assert (empty_repo / "notes" / "docs" / "PROGRESS.md").is_file()
+
+
+def test_the_repository_registers_the_hooks_itself(empty_repo):
+    """Registration through the plugin only reaches machines that installed
+    it. The repository is what every machine has, so it is what registers."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+
+    settings = json.loads((empty_repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
+
+    assert set(settings["hooks"]) == {
+        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop",
+    }
+    command = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert "CLAUDE_PROJECT_DIR" in command
+    assert "notes/.method/hooks/run-hook.cmd" in command
+    assert "session-start" in command
+
+
+def test_the_registered_wrapper_is_actually_there(empty_repo):
+    """A command naming a path that does not exist registers a hook that
+    never runs, and nothing reports it — the failure this whole change is
+    against."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+    settings = json.loads((empty_repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
+
+    command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
+    tail = command.split("}", 1)[1].split('"')[0].lstrip("/")
+
+    assert (empty_repo / tail).is_file(), tail
+
+
+def test_the_gate_says_how_to_get_the_checks_back(empty_repo):
+    """A gate that stops work has to name the way out. Sending people to
+    install a plugin does not restore the hooks — the repository registers
+    them, and `/notes` is what re-registers them."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+
+    text = (empty_repo / "notes" / "CLAUDE.md").read_text(encoding="utf-8")
+
+    assert "/notes" in text
+    assert "플러그인 설치" not in text
+
+
+def test_it_exits_nonzero_when_the_hooks_could_not_be_registered(empty_repo, capsys):
+    """The skeleton lands, the hooks never register, and the run reads as a
+    clean success -- so a script that chains on the exit code carries on into
+    a repository where nothing is checking anything."""
+    settings = empty_repo / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_text("{ 이건 JSON 이 아니다", encoding="utf-8")
+
+    code = notes_init.main(["--root", str(empty_repo), "--confirm", "fresh"])
+
+    assert "[실패]" in capsys.readouterr().out
+    assert code == 1
