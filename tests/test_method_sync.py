@@ -351,3 +351,24 @@ def test_a_repository_may_register_hooks_of_its_own(notes_repo):
     settings.write_text(json.dumps(data), encoding="utf-8")
 
     assert method_sync.verify(notes_repo).ok
+
+
+def test_the_gate_does_not_send_people_to_install_a_plugin(notes_repo):
+    """The hooks run from the repository now, so a missing readiness block no
+    longer means a missing plugin. Diagnosing it as one stopped work on a
+    machine where everything was in fact in place, and told the person to
+    install something that would have changed nothing."""
+    method_sync.sync(notes_repo)
+
+    head = (notes_repo / "notes" / ".method" / "RULES.md").read_text(encoding="utf-8")[:1800]
+
+    assert "중단" in head
+    assert "/notes" in head
+    assert "플러그인 설치" not in head
+
+
+def test_the_plugin_does_not_register_hooks_of_its_own(notes_repo):
+    """Claude Code keeps a plugin's hooks separate from a project's, and two
+    different command strings never deduplicate. Leaving hooks.json in place
+    would run every check twice and double every report."""
+    assert not (method_sync.PLUGIN_ROOT / "hooks" / "hooks.json").exists()

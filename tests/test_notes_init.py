@@ -397,3 +397,15 @@ def test_the_registered_wrapper_is_actually_there(empty_repo):
     tail = command.split("}", 1)[1].split('"')[0].lstrip("/")
 
     assert (empty_repo / tail).is_file(), tail
+
+
+def test_the_gate_says_how_to_get_the_checks_back(empty_repo):
+    """A gate that stops work has to name the way out. Sending people to
+    install a plugin does not restore the hooks — the repository registers
+    them, and `/notes` is what re-registers them."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+
+    text = (empty_repo / "notes" / "CLAUDE.md").read_text(encoding="utf-8")
+
+    assert "/notes" in text
+    assert "플러그인 설치" not in text
