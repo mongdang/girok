@@ -48,6 +48,7 @@ class InitResult:
     created: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     updated: list[str] = field(default_factory=list)
+    problems: list[str] = field(default_factory=list)
 
 
 def _template(name: str) -> str:
@@ -226,7 +227,9 @@ def init(
     result.created.append(f"{notes_dir}/.method/")
 
     rel = ".claude/settings.json"
-    if not sync_result.settings_changed:
+    if sync_result.settings_problem:
+        result.problems.append(sync_result.settings_problem)
+    elif not sync_result.settings_changed:
         result.skipped.append(rel)
     elif existed:
         result.updated.append(rel)
@@ -314,6 +317,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[갱신] {rel}")
     for rel in result.skipped:
         print(f"[유지] {rel} — 이미 있어서 건드리지 않음")
+    for problem in result.problems:
+        print(f"[실패] {problem}")
     print(json.dumps({
         "created": len(result.created),
         "updated": len(result.updated),

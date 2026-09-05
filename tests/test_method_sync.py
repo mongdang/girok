@@ -372,3 +372,131 @@ def test_the_plugin_does_not_register_hooks_of_its_own(notes_repo):
     different command strings never deduplicate. Leaving hooks.json in place
     would run every check twice and double every report."""
     assert not (method_sync.PLUGIN_ROOT / "hooks" / "hooks.json").exists()
+
+
+def test_sync_refuses_to_run_out_of_the_snapshot(notes_repo):
+    """PLUGIN_ROOT defaults to the script's own grandparent, so running the
+    snapshot's copy of this file with no plugin installed pointed sync at
+    .method/ itself: it deleted the folder, then looked for the sources
+    inside what it had just deleted. Every hook and linter vanished and the
+    run reported success."""
+    method_sync.sync(notes_repo)
+    method = notes_repo / "notes" / ".method"
+
+    with pytest.raises(method_sync.NoPluginError):
+        method_sync.sync(notes_repo, plugin_root=method)
+
+    assert (method / "hooks" / "session-start.py").is_file()
+    assert (method / "scripts" / "check_docs.py").is_file()
+    assert method_sync.verify(notes_repo).ok
+
+
+def test_sync_refuses_before_deleting_anything(notes_repo, tmp_path):
+    """The refusal has to come before the folder is removed. Refusing after
+    the rmtree would report an error and still have destroyed the snapshot."""
+    method_sync.sync(notes_repo)
+    rules = (notes_repo / "notes" / ".method" / "RULES.md").read_text(encoding="utf-8")
+
+    with pytest.raises(method_sync.NoPluginError):
+        method_sync.sync(notes_repo, plugin_root=tmp_path / "not-a-plugin")
+
+    assert (notes_repo / "notes" / ".method" / "RULES.md").read_text(encoding="utf-8") == rules
+
+
+def test_settings_sync_keeps_hooks_the_repository_added(notes_repo):
+    """verify allows a repository to register hooks of its own, so sync must
+    not delete them. Replacing the whole block silently stopped somebody
+    else's logging hook the first time /notes ran."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["UserPromptSubmit"].append(
+        {"hooks": [{"type": "command", "command": "echo 내 로깅 훅"}]}
+    )
+    data["hooks"]["SessionEnd"] = [{"hooks": [{"type": "command", "command": "echo 끝"}]}]
+    settings.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    method_sync.sync_settings(notes_repo, "notes/")
+
+    after = json.loads(settings.read_text(encoding="utf-8"))
+    commands = [
+        hook.get("command", "")
+        for entry in after["hooks"]["UserPromptSubmit"]
+        for hook in entry.get("hooks", [])
+    ]
+    assert any("내 로깅 훅" in c for c in commands), commands
+    assert "SessionEnd" in after["hooks"]
+    assert method_sync.verify(notes_repo).ok
+
+
+def test_settings_sync_replaces_only_its_own_entry(notes_repo):
+    """A stale girok entry from an older layout must go, or the repository
+    would keep a registration pointing at a wrapper that is not there."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["Stop"] = [
+        {"hooks": [{"type": "command", "command": '"old/.method/hooks/run-hook.cmd" stop'}]}
+    ]
+    settings.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    method_sync.sync_settings(notes_repo, "notes/")
+
+    after = json.loads(settings.read_text(encoding="utf-8"))
+    commands = [
+        hook.get("command", "")
+        for entry in after["hooks"]["Stop"]
+        for hook in entry.get("hooks", [])
+    ]
+    assert not any("old/.method" in c for c in commands), commands
+    assert method_sync.verify(notes_repo).ok
+
+
+def test_verify_rejects_a_registration_that_only_looks_right(notes_repo):
+    """Matching the wrapper as a substring passed a path that merely ends the
+    same way. The entry reads as correct in the file and the hook never runs
+    -- the exact failure this check exists to catch."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["Stop"][0]["hooks"][0]["command"] = (
+        '"$CLAUDE_PROJECT_DIR/vendor.notes/.method/hooks/run-hook.cmd" stop'
+    )
+    settings.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    result = method_sync.verify(notes_repo)
+
+    assert not result.ok
+    assert any("Stop" in problem for problem in result.problems)
+
+
+def test_a_corrupt_version_is_not_read_as_a_version(notes_repo):
+    """parse_version takes the last word of the stamp, so a VERSION holding
+    "corrupt data" reported the snapshot version as "data" -- and the session
+    then announced `ready vdata` for a snapshot nobody had checked."""
+    method_sync.sync(notes_repo)
+    version = notes_repo / "notes" / ".method" / "VERSION"
+    version.write_text("corrupt data\n", encoding="utf-8")
+
+    assert method_sync.status(notes_repo).snapshot_version is None
+
+
+def test_the_settings_template_can_still_be_rendered():
+    """The template goes through str.format, so a single unescaped brace in
+    it raises where the hooks are written. It is the one file whose breakage
+    leaves a repository with no registration at all."""
+    assert method_sync._default_settings(method_sync.PLUGIN_ROOT).get("enabledPlugins")
+
+
+def test_a_broken_settings_file_is_reported_not_silently_kept(notes_repo):
+    """Refusing to overwrite half-edited JSON is right; saying nothing about
+    it is not. The snapshot lands, the hooks do not register, and the run
+    reads as a clean success."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    settings.write_text("{ 이건 JSON 이 아니다", encoding="utf-8")
+
+    result = method_sync.sync(notes_repo)
+
+    assert result.settings_problem
+    assert "settings.json" in result.settings_problem

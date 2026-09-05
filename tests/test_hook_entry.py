@@ -347,3 +347,56 @@ def test_the_snapshot_pre_tool_use_still_blocks(ready_repo, tmp_path):
 
     assert out is not None, err
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_the_snapshot_user_prompt_submit_still_raises_the_gate(ready_repo, tmp_path):
+    """Exit code 0 only says the process lived. What matters is that the open
+    gate item reached the session."""
+    write(
+        ready_repo / "notes" / "docs" / "SAFETY_GATE.md",
+        "# 게이트\n\n| # | 항목 | 상태 |\n|---|---|---|\n| 1 | 정위치 | OPEN |\n",
+    )
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, out, err = run_hook(
+        "user-prompt-submit", SNAPSHOT_PAYLOADS["user-prompt-submit"](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert out is not None, err
+    assert "OPEN 1건" in out["hookSpecificOutput"]["additionalContext"]
+
+
+def test_the_snapshot_post_tool_use_still_checks_the_document(ready_repo, tmp_path):
+    board = write(
+        ready_repo / "notes" / "docs" / "PROGRESS.md",
+        "# 현황판\n\n---\n\n## 목차\n\n- [없음](#없음)\n\n---\n\n## 있음\n\n내용\n",
+    )
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, out, err = run_hook(
+        "post-tool-use",
+        {
+            "hook_event_name": "PostToolUse", "cwd": str(ready_repo),
+            "tool_name": "Edit", "tool_input": {"file_path": str(board)},
+        },
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert out is not None, err
+    assert "없음" in out["hookSpecificOutput"]["additionalContext"]
+
+
+def test_the_snapshot_stop_still_reports_to_stderr(ready_repo, tmp_path):
+    write(
+        ready_repo / "notes" / "docs" / "PROGRESS.md",
+        "# 현황판\n\n---\n\n## 목차\n\n- [없음](#없음)\n\n---\n\n## 있음\n\n내용\n",
+    )
+    hooks = ready_repo / "notes" / ".method" / "hooks"
+
+    _, _, err = run_hook(
+        "stop", SNAPSHOT_PAYLOADS["stop"](ready_repo),
+        hooks_dir=hooks, env=without_the_plugin(tmp_path),
+    )
+
+    assert "girok" in err

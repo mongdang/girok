@@ -113,6 +113,27 @@ GATE_BLOCK = """\
 """
 
 
+class NoPluginError(Exception):
+    """sync was asked to rebuild from something that is not the plugin.
+
+    PLUGIN_ROOT falls back to this file's own grandparent, which for the
+    snapshot's copy is `.method/` itself. sync deletes that folder before
+    rebuilding, so on a machine with no plugin the fallback pointed it at its
+    own sources: it removed every hook and linter, found nothing to copy
+    back, and reported success. The check has to run before anything is
+    deleted.
+    """
+
+
+class SettingsUnreadable(Exception):
+    """`.claude/settings.json` is there but could not be parsed.
+
+    Refusing to overwrite half-edited JSON is right. Saying nothing about it
+    is not -- the snapshot lands, the hooks never register, and the run reads
+    as a clean success.
+    """
+
+
 class NotOursError(Exception):
     """`.method/` exists but was not written by this plugin.
 
@@ -143,6 +164,7 @@ class SyncResult:
     removed: list[str] = field(default_factory=list)
     version: Version | None = None
     settings_changed: bool = False
+    settings_problem: str | None = None
 
 
 @dataclass
@@ -280,25 +302,65 @@ def sync_settings(root: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> b
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            # Someone is mid-edit. Overwriting would take their work with it,
-            # and an unregistered hook is visible (no ready marker) in a way
-            # a lost settings file is not.
-            return False
+        except (OSError, json.JSONDecodeError) as exc:
+            # Overwriting half-edited JSON would take someone's work with it,
+            # so this stops -- but loudly. The caller records the problem.
+            raise SettingsUnreadable(
+                f".claude/settings.json 을 읽을 수 없어 훅을 등록하지 못했다 ({exc}). "
+                f"그 파일을 고친 뒤 다시 sync 할 것 — 지금은 규칙이 저장소에 있어도 "
+                f"아무것도 검사하지 않는다"
+            ) from exc
     else:
         data = _default_settings(plugin_root)
 
-    wanted = hook_settings(prefix)
-    if data.get("hooks") == wanted:
+    registered = data.get("hooks") or {}
+    merged = dict(registered)
+    for event, entries in hook_settings(prefix).items():
+        # Ours replaced, everyone else's kept. verify lets a repository
+        # register hooks of its own, so sync deleting them was the two halves
+        # of this design disagreeing -- and the first `/notes` after an
+        # upgrade would silently stop somebody's logging hook.
+        merged[event] = entries + [e for e in registered.get(event, []) if not _is_ours(e)]
+    if merged == registered:
         return False
 
-    data["hooks"] = wanted
+    data["hooks"] = merged
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8", newline="\n",
     )
     return True
+
+
+WRAPPER_TAIL = ".method/hooks/run-hook.cmd"
+
+
+def _is_ours(entry: dict) -> bool:
+    """Whether a registration entry is one girok wrote.
+
+    Matched on the wrapper's tail rather than the full path so that an entry
+    left by an earlier layout -- a different notesDir, a renamed folder --
+    is recognized and replaced instead of accumulating beside the new one.
+    """
+    return any(WRAPPER_TAIL in hook.get("command", "") for hook in entry.get("hooks", []))
+
+
+def _runs_our_wrapper(command: str, wrapper: str) -> bool:
+    """Whether the command runs this repository's wrapper.
+
+    A plain substring test passed `vendor.notes/.method/hooks/run-hook.cmd`
+    for a repository whose wrapper is `notes/.method/hooks/run-hook.cmd`: the
+    entry reads as correct in the file and the hook never runs, which is the
+    one failure this check exists to catch. The character in front of the
+    match has to be a separator or the opening quote.
+    """
+    at = command.find(wrapper)
+    while at != -1:
+        if at == 0 or command[at - 1] in ("/", chr(92), '"', "'"):
+            return True
+        at = command.find(wrapper, at + 1)
+    return False
 
 
 def _default_settings(plugin_root: Path) -> dict:
@@ -341,7 +403,7 @@ def _registration_problems(cfg: notes_config.NotesConfig) -> list[str]:
             for entry in registered.get(event, [])
             for hook in entry.get("hooks", [])
         ]
-        if not any(wrapper in c and c.rstrip().endswith(script) for c in commands):
+        if not any(_runs_our_wrapper(c, wrapper) and c.rstrip().endswith(script) for c in commands):
             missing.append(event)
     if missing:
         return [
@@ -436,6 +498,15 @@ def _looks_like_ours(stamp: str) -> bool:
 
 
 def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult:
+    # Before anything is removed. sync rebuilds by deleting the folder first,
+    # and the PLUGIN_ROOT fallback can point at that very folder.
+    if not (plugin_root / ".claude-plugin" / "plugin.json").is_file():
+        raise NoPluginError(
+            f"{plugin_root} 는 girok 플러그인이 아니다 — sync 는 플러그인 원본에서만 돈다. "
+            f"플러그인이 설치된 머신에서 `/notes` 로 실행할 것. "
+            f"스냅샷은 손대지 않았다"
+        )
+
     cfg = notes_config.load(start)
     target = method_dir(cfg)
     result = SyncResult()
@@ -500,7 +571,10 @@ def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult
 
     # Registration belongs with the copy. Split in two, a repository could
     # sit with the hooks committed and nothing registering them.
-    result.settings_changed = sync_settings(cfg.repo_root, notes_prefix(cfg), plugin_root)
+    try:
+        result.settings_changed = sync_settings(cfg.repo_root, notes_prefix(cfg), plugin_root)
+    except SettingsUnreadable as exc:
+        result.settings_problem = str(exc)
     return result
 
 
@@ -587,7 +661,13 @@ def status(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> Status:
             stamp = version_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
             stamp = ""
-        snapshot = parse_version(stamp).plugin_version or None
+        # A stamp without our 64-hex content hash is not a version we wrote.
+        # Taking the last word of whatever the file holds announced
+        # `ready vdata` for a VERSION reading "corrupt data" -- the gate
+        # accepted a snapshot nobody had checked.
+        parsed = parse_version(stamp)
+        if len(parsed.content_hash) == 64:
+            snapshot = parsed.plugin_version or None
     return Status(snapshot_version=snapshot, plugin_version=plugin_version(plugin_root))
 
 
@@ -605,7 +685,9 @@ def main(argv: list[str] | None = None) -> int:
         result = sync(args.root)
         for rel in result.removed:
             print(f"[제거] 스냅샷에 없어야 할 파일: {rel}")
-        if result.settings_changed:
+        if result.settings_problem:
+            print(f"[실패] {result.settings_problem}")
+        elif result.settings_changed:
             print("[등록] .claude/settings.json 에 훅 5종 — 커밋해야 다른 머신에도 걸린다")
         print(f"[완료] {len(result.written)}개 파일, {result.version.render().strip()}")
         return 0

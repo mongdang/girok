@@ -172,3 +172,17 @@ def test_the_ready_marker_survives_a_missing_plugin(notes_repo, tmp_path):
     assert report.ready
     assert "[girok] ready v" in report.text
     assert "낡았을 수 있다" not in report.text
+
+
+def test_a_corrupt_snapshot_does_not_get_a_ready_marker(notes_repo):
+    """The gate keys off this marker, so emitting it for a snapshot whose
+    stamp is unreadable is worse than emitting nothing: the session reports
+    itself supervised on the strength of a file nobody could parse."""
+    method_sync.sync(notes_repo)
+    version = notes_repo / "notes" / ".method" / "VERSION"
+    version.write_text("corrupt data\n", encoding="utf-8")
+
+    report = build(notes_repo)
+
+    assert not report.ready
+    assert "[girok] ready" not in report.text
