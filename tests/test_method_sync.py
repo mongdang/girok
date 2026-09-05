@@ -8,6 +8,9 @@ Nobody edits it by hand — that would recreate the copy drift this whole
 design exists to remove — so the integrity check has to notice when someone
 did.
 """
+import os
+import subprocess
+
 import method_sync
 import pytest
 from conftest import write
@@ -205,3 +208,60 @@ def test_status_does_not_die_when_the_plugin_is_not_installed(notes_repo, tmp_pa
     assert state.plugin_version is None
     assert state.snapshot_version is not None
     assert not state.in_sync
+
+
+def test_sync_writes_the_hooks_too(notes_repo):
+    """Hooks that live only inside the plugin are hooks that do not run on a
+    machine without it. The snapshot is what a clone gets, so the enforcement
+    has to travel in it alongside the rule text."""
+    method_sync.sync(notes_repo)
+    hooks = notes_repo / "notes" / ".method" / "hooks"
+
+    for name in ("session-start.py", "pre-tool-use.py", "hook_io.py", "run-hook.cmd"):
+        assert (hooks / name).is_file(), name
+
+
+def test_editing_a_hook_changes_the_snapshot_hash(notes_repo):
+    """Hook code outside the content hash is hook code CI cannot vouch for --
+    the one file that decides what gets blocked would be the one file anyone
+    could quietly rewrite."""
+    method_sync.sync(notes_repo)
+    hook = notes_repo / "notes" / ".method" / "hooks" / "hook_io.py"
+    hook.write_text(hook.read_text(encoding="utf-8") + "\n# 한 줄\n", encoding="utf-8")
+
+    result = method_sync.verify(notes_repo)
+
+    assert not result.ok
+    assert any("hook_io.py" in problem for problem in result.problems)
+
+
+def test_verify_fails_when_a_hook_is_deleted(notes_repo):
+    method_sync.sync(notes_repo)
+    (notes_repo / "notes" / ".method" / "hooks" / "stop.py").unlink()
+
+    assert not method_sync.verify(notes_repo).ok
+
+
+def test_the_wrapper_is_committed_executable(notes_repo):
+    """copyfile drops the execute bit, and git on Windows adds new files as
+    100644 with no way to say otherwise. Either way the wrapper reaches a
+    Linux checkout unexecutable: registered, and silently never running --
+    a session that looks supervised and is not."""
+    subprocess.run(["git", "init", "-q"], cwd=notes_repo, check=True)
+
+    method_sync.sync(notes_repo)
+
+    listed = subprocess.run(
+        ["git", "ls-files", "-s", "notes/.method/hooks/run-hook.cmd"],
+        cwd=notes_repo, capture_output=True, text=True, check=True,
+    ).stdout
+    assert listed.startswith("100755"), listed or "(인덱스에 없다)"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows 파일에는 실행 비트가 없다")
+def test_the_wrapper_is_executable_on_disk(notes_repo):
+    method_sync.sync(notes_repo)
+
+    wrapper = notes_repo / "notes" / ".method" / "hooks" / "run-hook.cmd"
+
+    assert os.stat(wrapper).st_mode & 0o111
