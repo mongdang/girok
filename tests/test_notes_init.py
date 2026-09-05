@@ -368,3 +368,32 @@ def test_no_worker_folder_when_parallel_work_is_off(empty_repo):
 
     assert not (empty_repo / "notes" / "docs_abc").exists()
     assert (empty_repo / "notes" / "docs" / "PROGRESS.md").is_file()
+
+
+def test_the_repository_registers_the_hooks_itself(empty_repo):
+    """Registration through the plugin only reaches machines that installed
+    it. The repository is what every machine has, so it is what registers."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+
+    settings = json.loads((empty_repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
+
+    assert set(settings["hooks"]) == {
+        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop",
+    }
+    command = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert "CLAUDE_PROJECT_DIR" in command
+    assert "notes/.method/hooks/run-hook.cmd" in command
+    assert "session-start" in command
+
+
+def test_the_registered_wrapper_is_actually_there(empty_repo):
+    """A command naming a path that does not exist registers a hook that
+    never runs, and nothing reports it — the failure this whole change is
+    against."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+    settings = json.loads((empty_repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
+
+    command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
+    tail = command.split("}", 1)[1].split('"')[0].lstrip("/")
+
+    assert (empty_repo / tail).is_file(), tail

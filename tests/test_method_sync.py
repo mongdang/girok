@@ -8,6 +8,7 @@ Nobody edits it by hand — that would recreate the copy drift this whole
 design exists to remove — so the integrity check has to notice when someone
 did.
 """
+import json
 import os
 import subprocess
 
@@ -265,3 +266,88 @@ def test_the_wrapper_is_executable_on_disk(notes_repo):
     wrapper = notes_repo / "notes" / ".method" / "hooks" / "run-hook.cmd"
 
     assert os.stat(wrapper).st_mode & 0o111
+
+
+def test_settings_sync_keeps_what_was_already_there(tmp_path):
+    """Every repository that adopted girok before this already has a
+    settings.json, and `_write` skips a file that exists — so the hooks would
+    never arrive. Adding them must not cost the permissions someone put
+    there by hand."""
+    (tmp_path / ".claude").mkdir(parents=True)
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": ["Bash(ls:*)"]}}), encoding="utf-8"
+    )
+
+    changed = method_sync.sync_settings(tmp_path, "notes/")
+
+    settings = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    assert changed
+    assert settings["permissions"]["allow"] == ["Bash(ls:*)"]
+    assert "SessionStart" in settings["hooks"]
+
+
+def test_settings_sync_says_nothing_changed_the_second_time(tmp_path):
+    """`/notes` runs on every drift. Reporting a change each time would train
+    people to ignore the one that matters."""
+    method_sync.sync_settings(tmp_path, "notes/")
+
+    assert not method_sync.sync_settings(tmp_path, "notes/")
+
+
+def test_a_flat_repository_registers_hooks_at_its_root(tmp_path):
+    """notesDir "." puts .method/ at the root. A path with notes/ baked in
+    would register a wrapper that is not there."""
+    method_sync.sync_settings(tmp_path, "")
+
+    settings = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    command = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+
+    assert "/.method/hooks/run-hook.cmd" in command
+    assert "notes/" not in command
+
+
+def test_verify_fails_when_the_hooks_are_not_registered(notes_repo):
+    """Hooks sitting in the snapshot that nothing registers are hooks that
+    never run. Inside a session the missing ready marker catches that -- but
+    the marker itself comes from a hook, so something outside the session has
+    to be able to see it too."""
+    method_sync.sync(notes_repo)
+    assert method_sync.verify(notes_repo).ok
+
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    del data["hooks"]
+    settings.write_text(json.dumps(data), encoding="utf-8")
+
+    result = method_sync.verify(notes_repo)
+
+    assert not result.ok
+    assert any("settings.json" in problem for problem in result.problems)
+
+
+def test_verify_fails_when_a_registration_points_somewhere_else(notes_repo):
+    """A stale path is worse than a missing one: the entry reads as correct
+    and the hook still never runs."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["Stop"][0]["hooks"][0]["command"] = '"/somewhere/else/run-hook.cmd" stop'
+    settings.write_text(json.dumps(data), encoding="utf-8")
+
+    result = method_sync.verify(notes_repo)
+
+    assert not result.ok
+    assert any("Stop" in problem for problem in result.problems)
+
+
+def test_a_repository_may_register_hooks_of_its_own(notes_repo):
+    """Comparing the whole block would fail a repository that added a hook of
+    its own, and a check that punishes ordinary use gets removed rather than
+    obeyed."""
+    method_sync.sync(notes_repo)
+    settings = notes_repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["Stop"].append({"hooks": [{"type": "command", "command": "echo 내 훅"}]})
+    settings.write_text(json.dumps(data), encoding="utf-8")
+
+    assert method_sync.verify(notes_repo).ok
