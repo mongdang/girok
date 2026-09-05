@@ -119,6 +119,21 @@ claude plugin install girok@mongdang
 Claude Code 안에서라면 `/plugin marketplace add mongdang/girok` → `/plugin install girok@mongdang`.
 설치 후 **Claude Code 를 껐다 켠다** — 훅은 세션이 시작할 때 붙는다.
 
+이미 깔려 있다면 갱신도 같은 자리다. 설치본은 버전별 폴더에 캐시되므로 명령 없이는
+옛 사본을 계속 쓴다.
+
+```bash
+claude plugin marketplace update mongdang
+claude plugin update girok@mongdang
+```
+
+> [!IMPORTANT]
+> **0.18 이하를 쓰던 저장소는 저장소마다 `/notes` 를 한 번 돌려야 한다.** 0.19.0 부터
+> 훅 등록은 플러그인이 아니라 저장소의 `.claude/settings.json` 에 있다. 플러그인만
+> 갱신하고 `/notes` 를 돌리지 않으면 플러그인은 더 이상 훅을 들고 있지 않고 저장소에는
+> 아직 등록이 없어 **검사가 아무 데서도 돌지 않는다.** 돌린 결과(`.method/` 와
+> `.claude/settings.json`)를 커밋하면 팀원 머신에도 그대로 걸린다.
+
 > [!TIP]
 > **이미 girok 이 들어간 저장소에서 작업만 할 거라면 이 단계는 필요 없다.** 훅·검사기·규칙
 > 전문이 저장소에 함께 커밋돼 있고, 훅 등록도 저장소의 `.claude/settings.json` 에 있다.

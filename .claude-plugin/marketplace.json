@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "girok",
-      "description": "문서 방법론을 플러그인으로 — 현황판·결정 기록(ADR)·아카이브 분리, 문서 검사기, 실장비 프로젝트용 안전 게이트, 병행 작업 병합 규칙.",
+      "description": "문서 방법론을 플러그인으로 — 현황판·결정 기록(ADR)·아카이브 분리, 문서 검사기, 실장비 프로젝트용 안전 게이트, 병행 작업 병합 규칙. 규칙과 훅의 동결 사본(.method/)이 저장소에 커밋되어, 플러그인이 없는 머신에서도 검사가 그대로 돈다.",
       "source": "./",
       "category": "productivity",
       "tags": ["documentation", "adr", "linter", "methodology", "safety-gate"]
