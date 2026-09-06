@@ -48,6 +48,7 @@ class InitResult:
     created: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     updated: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
 
 
@@ -226,6 +227,11 @@ def init(
     sync_result = method_sync.sync(root, plugin_root)
     result.created.append(f"{notes_dir}/.method/")
 
+    if sync_result.gate_refreshed:
+        result.updated.append((notes / "CLAUDE.md").relative_to(root).as_posix())
+    if sync_result.gate_problem:
+        result.notices.append(sync_result.gate_problem)
+
     rel = ".claude/settings.json"
     if sync_result.settings_problem:
         result.problems.append(sync_result.settings_problem)
@@ -317,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[갱신] {rel}")
     for rel in result.skipped:
         print(f"[유지] {rel} — 이미 있어서 건드리지 않음")
+    for notice in result.notices:
+        print(f"[확인] {notice}")
     for problem in result.problems:
         print(f"[실패] {problem}")
     print(json.dumps({
