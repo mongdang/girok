@@ -125,6 +125,15 @@ class NoPluginError(Exception):
     """
 
 
+class GateUnrecognized(Exception):
+    """The pointer has no bootstrap gate this can safely replace.
+
+    Either somebody rewrote it or it was never there. Overwriting somebody's
+    rules to correct a sentence is the wrong trade, so it stops and says
+    which file to look at.
+    """
+
+
 class SettingsUnreadable(Exception):
     """`.claude/settings.json` is there but could not be parsed.
 
@@ -165,6 +174,8 @@ class SyncResult:
     version: Version | None = None
     settings_changed: bool = False
     settings_problem: str | None = None
+    gate_refreshed: bool = False
+    gate_problem: str | None = None
 
 
 @dataclass
@@ -331,6 +342,71 @@ def sync_settings(root: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> b
         encoding="utf-8", newline="\n",
     )
     return True
+
+
+BOOTSTRAP_BEGIN = "<!-- girok:bootstrap:begin -->"
+BOOTSTRAP_END = "<!-- girok:bootstrap:end -->"
+
+
+def bootstrap_block(plugin_root: Path, prefix: str) -> str:
+    """The bootstrap gate as this revision of the plugin writes it."""
+    text = (plugin_root / "templates" / "CLAUDE.md.pointer").read_text(encoding="utf-8")
+    start = text.index(BOOTSTRAP_BEGIN)
+    end = text.index(BOOTSTRAP_END) + len(BOOTSTRAP_END)
+    return text[start:end].format(notesPrefix=prefix)
+
+
+def sync_gate(pointer: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> bool:
+    """Bring a repository's bootstrap gate up to this revision's wording.
+
+    Initialization never overwrites a file that exists, so a repository
+    adopted before a wording change kept its gate forever -- and the one
+    0.18 wrote sends people to install a plugin they no longer need. Only
+    the marked block is replaced; everything a project wrote around it is
+    somebody's writing and stays.
+    """
+    if not pointer.is_file():
+        return False
+    with pointer.open(encoding="utf-8", newline="") as handle:
+        raw = handle.read()
+    crlf = "\r\n" in raw
+    text = raw.replace("\r\n", "\n")
+
+    replaced = _replace_bootstrap(text, bootstrap_block(plugin_root, prefix))
+    if replaced is None:
+        raise GateUnrecognized(
+            f"{pointer} 에서 girok 게이트 블록을 찾지 못해 문언을 갱신하지 못했다. "
+            f"손으로 고쳐 쓴 것이라면 그대로 두는 것이 맞다 — 현재 문언은 "
+            f".method/RULES.md 머리에 있다"
+        )
+    if replaced == text:
+        return False
+    with pointer.open("w", encoding="utf-8", newline="\r\n" if crlf else "\n") as handle:
+        handle.write(replaced)
+    return True
+
+
+def _replace_bootstrap(text: str, block: str) -> str | None:
+    start = text.find(BOOTSTRAP_BEGIN)
+    end = text.find(BOOTSTRAP_END)
+    if start != -1 and end != -1:
+        return text[:start] + block + text[end + len(BOOTSTRAP_END):]
+
+    # Adopted before the markers existed. The block is found by shape -- the
+    # CAUTION callout that names the ready marker -- because that sentence is
+    # the only thing separating it from the equipment safety callout sitting
+    # further down the same file.
+    lines = text.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if line.strip() != "> [!CAUTION]":
+            continue
+        j = i
+        while j < len(lines) and lines[j].lstrip().startswith(">"):
+            j += 1
+        if "[girok] ready" not in "".join(lines[i:j]):
+            continue
+        return "".join(lines[:i]) + block + "\n" + "".join(lines[j:])
+    return None
 
 
 WRAPPER_TAIL = ".method/hooks/run-hook.cmd"
@@ -593,6 +669,13 @@ def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult
     if wrapper.is_file():
         _make_executable(wrapper, cfg.repo_root)
 
+    try:
+        result.gate_refreshed = sync_gate(
+            target.parent / "CLAUDE.md", notes_prefix(cfg), plugin_root
+        )
+    except GateUnrecognized as exc:
+        result.gate_problem = str(exc)
+
     # Registration belongs with the copy. Split in two, a repository could
     # sit with the hooks committed and nothing registering them.
     try:
@@ -711,6 +794,10 @@ def main(argv: list[str] | None = None) -> int:
         result = sync(args.root)
         for rel in result.removed:
             print(f"[제거] 스냅샷에 없어야 할 파일: {rel}")
+        if result.gate_refreshed:
+            print("[갱신] CLAUDE.md 게이트 문언 — 커밋해야 다른 머신에도 걸린다")
+        if result.gate_problem:
+            print(f"[확인] {result.gate_problem}")
         if result.settings_problem:
             print(f"[실패] {result.settings_problem}")
         elif result.settings_changed:

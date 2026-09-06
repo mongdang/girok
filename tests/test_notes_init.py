@@ -423,3 +423,15 @@ def test_it_exits_nonzero_when_the_hooks_could_not_be_registered(empty_repo, cap
 
     assert "[실패]" in capsys.readouterr().out
     assert code == 1
+
+
+def test_the_gate_block_is_marked_so_later_versions_can_refresh_it(empty_repo):
+    """Without the markers the next wording change cannot reach a repository
+    that already has this file -- initialization never overwrites it."""
+    import method_sync
+
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
+
+    text = (empty_repo / "notes" / "CLAUDE.md").read_text(encoding="utf-8")
+    assert method_sync.BOOTSTRAP_BEGIN in text
+    assert method_sync.BOOTSTRAP_END in text

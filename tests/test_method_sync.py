@@ -559,3 +559,132 @@ def test_a_sync_that_fails_partway_leaves_the_snapshot_it_had(notes_repo, monkey
     after = sorted(p.relative_to(method).as_posix() for p in method.rglob("*") if p.is_file())
     assert after == before
     assert method_sync.verify(notes_repo).ok
+
+
+# The gate as repositories adopted before 0.20.0 carry it. Its stop rule is
+# the same one we ship today; what it names as the cause is not.
+LEGACY_BLOCK = """> [!CAUTION]
+> ## 작업 전 필수 확인 — 통과 못 하면 어떤 편집도 하지 않는다
+>
+> 이 저장소는 `girok` 방법론 아래서만 작업한다.
+>
+> 1. `notes/.method/VERSION` 이 있는가? 없으면 **작업을 중단**하고 사용자에게
+>    폴더 신뢰 승인과 플러그인 설치를 요청한다.
+> 2. 이 세션에 `[girok] ready vX.Y.Z` 주입 블록이 있는가? 없으면 플러그인이
+>    로드되지 않은 것이다 — **작업을 중단**하고 사용자에게 알린다.
+> 3. 플러그인을 쓸 수 없는 에이전트라면 `notes/.method/RULES.md` 를 **끝까지 읽은
+>    뒤에만** 작업한다.
+"""
+
+LEGACY_POINTER = (
+    "# rc — 진행기록 지침\n\n"
+    + LEGACY_BLOCK
+    + "\n## 이 저장소 고유 규칙\n\n- 배포 전에 반드시 현장 확인을 받는다.\n"
+)
+
+SAFETY_CALLOUT = (
+    "> [!CAUTION]\n"
+    "> 1. `SAFETY_GATE.md` 의 OPEN 항목이 남아 있는 동안 모션 명령을 실행하지 않는다.\n"
+)
+
+
+def test_sync_refreshes_a_gate_written_before_the_markers(notes_repo):
+    """Initialization never overwrites a file that exists, so a repository
+    adopted before a wording change kept its gate forever -- and the one it
+    kept sent people to install a plugin they no longer need."""
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    pointer.write_text(LEGACY_POINTER, encoding="utf-8")
+
+    result = method_sync.sync(notes_repo)
+
+    text = pointer.read_text(encoding="utf-8")
+    assert result.gate_refreshed
+    assert "로드되지 않은 것이다" not in text
+    assert "폴더 신뢰를" in text
+    assert method_sync.BOOTSTRAP_BEGIN in text and method_sync.BOOTSTRAP_END in text
+
+
+def test_the_project_own_rules_survive_the_refresh(notes_repo):
+    """Everything around the block is somebody's writing. Rewriting the file
+    from the template would take it."""
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    pointer.write_text(LEGACY_POINTER, encoding="utf-8")
+
+    method_sync.sync(notes_repo)
+
+    text = pointer.read_text(encoding="utf-8")
+    assert "배포 전에 반드시 현장 확인을 받는다." in text
+    assert text.startswith("# rc — 진행기록 지침")
+
+
+def test_sync_does_not_rewrite_a_gate_that_is_already_current(notes_repo):
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    pointer.write_text(LEGACY_POINTER, encoding="utf-8")
+    method_sync.sync(notes_repo)
+    settled = pointer.read_text(encoding="utf-8")
+
+    result = method_sync.sync(notes_repo)
+
+    assert not result.gate_refreshed
+    assert pointer.read_text(encoding="utf-8") == settled
+
+
+def test_a_gate_someone_rewrote_is_left_alone_and_said_so(notes_repo):
+    """Overwriting somebody's rules to correct a sentence is the wrong
+    trade. It stops and names the file instead."""
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    theirs = LEGACY_POINTER.replace("`[girok] ready vX.Y.Z` 주입 블록", "우리 팀 표시")
+    pointer.write_text(theirs, encoding="utf-8")
+
+    result = method_sync.sync(notes_repo)
+
+    assert pointer.read_text(encoding="utf-8") == theirs
+    assert result.gate_problem and "CLAUDE.md" in result.gate_problem
+
+
+def test_the_safety_callout_is_not_mistaken_for_the_bootstrap_gate(notes_repo):
+    """The equipment safety rules are a CAUTION callout too. Replacing the
+    first one found would overwrite them with a bootstrap check."""
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    pointer.write_text("# rc\n\n" + SAFETY_CALLOUT + "\n" + LEGACY_BLOCK, encoding="utf-8")
+
+    method_sync.sync(notes_repo)
+
+    text = pointer.read_text(encoding="utf-8")
+    assert "모션 명령을 실행하지 않는다" in text
+    assert method_sync.BOOTSTRAP_BEGIN in text
+    assert "로드되지 않은 것이다" not in text
+
+
+def test_a_pointer_with_no_gate_at_all_is_reported(notes_repo):
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    pointer.write_text("# rc\n\n아무 게이트도 없다.\n", encoding="utf-8")
+
+    result = method_sync.sync(notes_repo)
+
+    assert result.gate_problem
+
+
+def test_the_gate_block_takes_only_the_notes_prefix():
+    """The block is rendered on its own, so a placeholder added to it that
+    this renderer does not know raises where the gate is refreshed."""
+    block = method_sync.bootstrap_block(method_sync.PLUGIN_ROOT, "notes/")
+
+    assert "{" not in block
+    assert "notes/.method/VERSION" in block
+
+
+def test_a_pointer_kept_in_crlf_stays_in_crlf(notes_repo):
+    """A checkout with autocrlf holds this file in CRLF. Rewriting it in LF
+    would show every line as changed, and the one edit that matters would be
+    invisible in that diff."""
+    pointer = notes_repo / "notes" / "CLAUDE.md"
+    with pointer.open("w", encoding="utf-8", newline="\r\n") as handle:
+        handle.write(LEGACY_POINTER)
+
+    assert method_sync.sync(notes_repo).gate_refreshed
+
+    with pointer.open(encoding="utf-8", newline="") as handle:
+        raw = handle.read()
+    assert "\r\n" in raw
+    assert "\n" not in raw.replace("\r\n", "")
