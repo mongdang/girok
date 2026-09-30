@@ -7,6 +7,9 @@ pointers rather than copies of the rules, and nothing already written is
 overwritten.
 """
 import json
+import os
+import shutil
+import subprocess
 
 import check_docs
 import notes_init
@@ -381,7 +384,7 @@ def test_the_repository_registers_the_hooks_itself(empty_repo):
         "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop",
     }
     command = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    assert "CLAUDE_PROJECT_DIR" in command
+    assert "git rev-parse --show-toplevel" in command
     assert "notes/.method/hooks/run-hook.cmd" in command
     assert "session-start" in command
 
@@ -394,9 +397,40 @@ def test_the_registered_wrapper_is_actually_there(empty_repo):
     settings = json.loads((empty_repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
 
     command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
-    tail = command.split("}", 1)[1].split('"')[0].lstrip("/")
+    tail = command.split(")", 1)[1].split('"')[0].lstrip("/")
 
     assert (empty_repo / tail).is_file(), tail
+
+
+@pytest.mark.skipif(
+    shutil.which("bash") is None or shutil.which("git") is None,
+    reason="등록된 명령을 풀어 볼 bash·git 이 없다",
+)
+def test_the_wrapper_is_found_after_moving_into_the_repository(tmp_path):
+    """`/cd` into a repository leaves CLAUDE_PROJECT_DIR on the folder the
+    session started in, while the hooks loaded are this repository's -- so
+    every hook named a wrapper under the old folder and failed on each call.
+    The hook also runs in the session's current folder, which can be a
+    subfolder."""
+    root = tmp_path / "fresh"
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    notes_init.init(root, notes_dir="notes", repo_name="fresh")
+    settings = json.loads((root / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
+    wrapper = command.rsplit(" ", 1)[0]
+    elsewhere = tmp_path / "started-here"
+    elsewhere.mkdir()
+
+    result = subprocess.run(
+        [shutil.which("bash"), "-c", f"test -f {wrapper} && echo found"],
+        cwd=root / "notes" / "docs",
+        env={**os.environ, "CLAUDE_PROJECT_DIR": elsewhere.as_posix()},
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "found", (command, result.stderr)
 
 
 def test_the_gate_says_how_to_get_the_checks_back(empty_repo):

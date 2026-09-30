@@ -280,10 +280,20 @@ def notes_prefix(cfg: notes_config.NotesConfig) -> str:
 def hook_settings(prefix: str) -> dict:
     """The hooks block that registers the snapshot's own copies.
 
-    `${CLAUDE_PROJECT_DIR}` rather than the plugin root, which is the whole
+    Rooted in the repository rather than the plugin root, which is the whole
     point: these have to run on a machine where no plugin root exists.
+
+    The root is asked of git at run time, not taken from
+    `${CLAUDE_PROJECT_DIR}`. That variable is fixed to the folder the session
+    started in, and `/cd` into a repository does not update it -- while the
+    hooks it loads are this repository's. Every hook then named a wrapper
+    under the old folder and failed on each call. The hook runs in the
+    session's current folder, which may be a subfolder, so a bare relative
+    path does not do either. `${CLAUDE_PROJECT_DIR}` stays as the fallback
+    for a folder git cannot answer for.
     """
-    wrapper = f"${{CLAUDE_PROJECT_DIR}}/{prefix}.method/hooks/run-hook.cmd"
+    root = '$(git rev-parse --show-toplevel 2>/dev/null || echo "$CLAUDE_PROJECT_DIR")'
+    wrapper = f"{root}/{prefix}.method/hooks/run-hook.cmd"
     events = {}
     for event, script, matcher, timeout in HOOK_EVENTS:
         entry = {} if matcher is None else {"matcher": matcher}
