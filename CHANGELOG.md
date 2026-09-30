@@ -8,6 +8,20 @@
 
 ---
 
+## 0.20.2 — Git Bash 없는 Windows 에서 0.20.1 의 훅 등록이 깨지던 것
+
+0.20.1 은 래퍼 경로에 `|| echo "$CLAUDE_PROJECT_DIR"` 되돌아가기를 붙였다. Git Bash 가
+없는 Windows 에서 Claude Code 는 훅을 PowerShell 로 띄우는데, Windows PowerShell 5.1 에는
+`||` 가 없어 **등록된 훅 전부가 문법 오류**가 된다. bash 에서는 문제가 없었다.
+
+- 경로를 `"$(git rev-parse --show-toplevel)/…"` 만으로 잡는다. bash 와 PowerShell 5.1 이
+  같은 뜻으로 읽는 형태다(둘 다 하위 폴더·옛 `CLAUDE_PROJECT_DIR` 조건에서 실측).
+- 대가로 git 저장소 밖 폴더에서는 래퍼를 찾지 못한다. girok 저장소는 git 저장소라 세션이
+  저장소 밖으로 나간 경우에만 해당한다.
+- 0.20.1 로 `/notes` 를 돌린 저장소는 0.20.2 로 한 번 더 돌린다.
+
+---
+
 ## 0.20.1 — `/cd` 로 옮겨 온 세션에서도 훅이 돈다
 
 다른 폴더에서 연 세션을 `/cd` 로 저장소에 옮기면, 모든 훅이 호출될 때마다

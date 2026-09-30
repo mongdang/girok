@@ -289,10 +289,14 @@ def hook_settings(prefix: str) -> dict:
     hooks it loads are this repository's. Every hook then named a wrapper
     under the old folder and failed on each call. The hook runs in the
     session's current folder, which may be a subfolder, so a bare relative
-    path does not do either. `${CLAUDE_PROJECT_DIR}` stays as the fallback
-    for a folder git cannot answer for.
+    path does not do either.
+
+    Nothing but `"$(...)"`, because that is the one form bash and Windows
+    PowerShell 5.1 read the same way -- PowerShell is what runs the hooks
+    where Git Bash is missing. A `|| echo "$CLAUDE_PROJECT_DIR"` fallback was
+    tried and is a parse error in 5.1, which has no `||`.
     """
-    root = '$(git rev-parse --show-toplevel 2>/dev/null || echo "$CLAUDE_PROJECT_DIR")'
+    root = "$(git rev-parse --show-toplevel)"
     wrapper = f"{root}/{prefix}.method/hooks/run-hook.cmd"
     events = {}
     for event, script, matcher, timeout in HOOK_EVENTS:

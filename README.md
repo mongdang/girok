@@ -135,6 +135,8 @@ claude plugin update girok@mongdang
 > `.claude/settings.json`)를 커밋하면 팀원 머신에도 그대로 걸린다.
 > 0.20.0 부터는 같은 `/notes` 가 `CLAUDE.md` 의 게이트 문언까지 맞춘다 — 손으로 고쳐 쓴
 > 게이트는 알아보지 못했다고 말하고 그대로 둔다.
+> 0.20.2 부터는 다른 폴더에서 연 세션을 `/cd` 로 저장소에 옮겨도 훅이 돈다 — 그 전 등록은
+> 훅마다 `run-hook.cmd: No such file or directory` 로 실패한다. 역시 `/notes` 한 번으로 바뀐다.
 
 > [!TIP]
 > **이미 girok 이 들어간 저장소에서 작업만 할 거라면 이 단계는 필요 없다.** 훅·검사기·규칙

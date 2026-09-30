@@ -402,16 +402,27 @@ def test_the_registered_wrapper_is_actually_there(empty_repo):
     assert (empty_repo / tail).is_file(), tail
 
 
-@pytest.mark.skipif(
-    shutil.which("bash") is None or shutil.which("git") is None,
-    reason="등록된 명령을 풀어 볼 bash·git 이 없다",
-)
-def test_the_wrapper_is_found_after_moving_into_the_repository(tmp_path):
+# Claude Code runs hooks with Git Bash on Windows, or PowerShell where Git
+# Bash is missing -- the registered command has to mean the same in both.
+SHELLS = {
+    "bash": lambda w: [shutil.which("bash"), "-c", f"test -f {w} && echo found"],
+    "powershell": lambda w: [
+        shutil.which("powershell"), "-NoProfile", "-Command",
+        f"if (Test-Path {w}) {{ 'found' }}",
+    ],
+}
+
+
+@pytest.mark.parametrize("shell", sorted(SHELLS))
+def test_the_wrapper_is_found_after_moving_into_the_repository(tmp_path, shell):
     """`/cd` into a repository leaves CLAUDE_PROJECT_DIR on the folder the
     session started in, while the hooks loaded are this repository's -- so
     every hook named a wrapper under the old folder and failed on each call.
     The hook also runs in the session's current folder, which can be a
-    subfolder."""
+    subfolder. A `|| echo` fallback fixed bash and was a parse error in
+    Windows PowerShell 5.1."""
+    if shutil.which(shell) is None or shutil.which("git") is None:
+        pytest.skip(f"등록된 명령을 풀어 볼 {shell}·git 이 없다")
     root = tmp_path / "fresh"
     root.mkdir()
     subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -423,7 +434,7 @@ def test_the_wrapper_is_found_after_moving_into_the_repository(tmp_path):
     elsewhere.mkdir()
 
     result = subprocess.run(
-        [shutil.which("bash"), "-c", f"test -f {wrapper} && echo found"],
+        SHELLS[shell](wrapper),
         cwd=root / "notes" / "docs",
         env={**os.environ, "CLAUDE_PROJECT_DIR": elsewhere.as_posix()},
         capture_output=True,
