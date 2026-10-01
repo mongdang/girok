@@ -7,13 +7,13 @@ linter, so absent config falls back to looking for a folder that contains
 `docs/`.
 
 The layout keys exist because the second repository to adopt this had a
-different one – `STATE.md` and `decisions/NNN-slug.md` at the root instead
+different one - `STATE.md` and `decisions/NNN-slug.md` at the root instead
 of `docs/PROGRESS.md` and `docs/decisions/ADR-NNN-slug.md`. Renaming its
 52 decision files would have cost more than it returned, and a methodology
 that only fits the repository it was extracted from is a copy with extra
 steps.
 
-`pluginConfigs` cannot be used for this – its settings scope is
+`pluginConfigs` cannot be used for this - its settings scope is
 user-or-managed, so a value committed to a repository is ignored.
 """
 import json
@@ -80,7 +80,7 @@ class NotesConfig:
 
     @property
     def docs_dir(self) -> Path:
-        """The first configured doc root – where the board and gate live."""
+        """The first configured doc root - where the board and gate live."""
         return self.notes_dir / self.doc_roots_relative[0]
 
     @property
@@ -110,7 +110,7 @@ class NotesConfig:
         """Byte budget for a document read in full every session.
 
         Korean text is three bytes per character in UTF-8, so counting
-        characters understates the real context cost – count bytes.
+        characters understates the real context cost - count bytes.
         """
         if name == self.board:
             return self.limits_kb.get("board", DEFAULT_LIMITS_KB["board"]) * 1000
@@ -134,8 +134,8 @@ def find_repo_root(start: Path) -> Path:
 def _is_repository(root: Path) -> bool:
     """A repository, as opposed to a directory that merely contains some.
 
-    Claude Code has no repository picker – the folder it was started in is
-    the subject – so being started one level too high is an ordinary mistake
+    Claude Code has no repository picker - the folder it was started in is
+    the subject - so being started one level too high is an ordinary mistake
     with a bad outcome, and it has to be recognized rather than guessed
     around.
     """
@@ -143,7 +143,7 @@ def _is_repository(root: Path) -> bool:
 
 
 # Files that mark a folder as a project in its own right. Used only to
-# recognize a *parent* of several projects – never to require one, because a
+# recognize a *parent* of several projects - never to require one, because a
 # records repository has no manifest and rejecting those was the bug this
 # replaced.
 MANIFESTS = (
@@ -212,7 +212,7 @@ def load(start: Path | str = ".") -> NotesConfig:
     adr_style = raw.get("adrStyle", "adr-prefixed")
     if adr_style not in ADR_STYLES:
         raise ValueError(
-            f"adrStyle 이 {adr_style} – {' 또는 '.join(ADR_STYLES)} 중 하나여야 한다"
+            f"adrStyle 이 {adr_style} - {' 또는 '.join(ADR_STYLES)} 중 하나여야 한다"
         )
 
     return NotesConfig(
@@ -233,7 +233,7 @@ def load(start: Path | str = ".") -> NotesConfig:
         decisions_relative=raw.get("decisionsDir") or DEFAULT_DECISIONS_DIR,
         # `or` rather than a default argument: a key present but empty (`[]`,
         # `null`) is a config someone half-edited, and an empty docRoots left
-        # `docs_dir` indexing an empty tuple – every check died on it.
+        # `docs_dir` indexing an empty tuple - every check died on it.
         doc_roots_relative=tuple(raw.get("docRoots") or DEFAULT_DOC_ROOTS),
         root_docs=tuple(raw.get("rootDocs") or DEFAULT_ROOT_DOCS),
         rules_docs=tuple(raw.get("rulesDocs") or DEFAULT_RULES_DOCS),

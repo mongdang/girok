@@ -4,8 +4,8 @@ The snapshot is what makes a repository self-contained: clone it and the
 full rule text is there, without the plugin, readable by any agent. It also
 records which revision of the rules applied at each commit.
 
-Nobody edits it by hand – that would recreate the copy drift this whole
-design exists to remove – so the integrity check has to notice when someone
+Nobody edits it by hand - that would recreate the copy drift this whole
+design exists to remove - so the integrity check has to notice when someone
 did.
 """
 import json
@@ -183,7 +183,7 @@ def test_sync_replaces_a_folder_it_recognizes(notes_repo):
 def test_sync_still_recognizes_a_pre_rename_snapshot(notes_repo):
     """Snapshots written before the girok rename identify themselves with the
     old plugin name, which is deliberately not spelled anywhere anymore. They
-    are recognized by the stamp's shape – the 64-hex content hash – so an
+    are recognized by the stamp's shape - the 64-hex content hash - so an
     adopted repository's first re-sync after the rename still runs."""
     method_sync.sync(notes_repo)
     version = notes_repo / "notes" / ".method" / "VERSION"
@@ -201,7 +201,7 @@ def test_sync_still_recognizes_a_pre_rename_snapshot(notes_repo):
 def test_status_does_not_die_when_the_plugin_is_not_installed(notes_repo, tmp_path):
     """The snapshot carries the hooks now, so a session runs on machines with
     no plugin at all. Raising here took the whole session-start report down
-    with it – a repository that was fully set up reported nothing."""
+    with it - a repository that was fully set up reported nothing."""
     method_sync.sync(notes_repo)
 
     state = method_sync.status(notes_repo, tmp_path / "no-plugin-here")
@@ -270,7 +270,7 @@ def test_the_wrapper_is_executable_on_disk(notes_repo):
 
 def test_settings_sync_keeps_what_was_already_there(tmp_path):
     """Every repository that adopted girok before this already has a
-    settings.json, and `_write` skips a file that exists – so the hooks would
+    settings.json, and `_write` skips a file that exists - so the hooks would
     never arrive. Adding them must not cost the permissions someone put
     there by hand."""
     (tmp_path / ".claude").mkdir(parents=True)
@@ -564,20 +564,20 @@ def test_a_sync_that_fails_partway_leaves_the_snapshot_it_had(notes_repo, monkey
 # The gate as repositories adopted before 0.20.0 carry it. Its stop rule is
 # the same one we ship today; what it names as the cause is not.
 LEGACY_BLOCK = """> [!CAUTION]
-> ## 작업 전 필수 확인 – 통과 못 하면 어떤 편집도 하지 않는다
+> ## 작업 전 필수 확인 - 통과 못 하면 어떤 편집도 하지 않는다
 >
 > 이 저장소는 `girok` 방법론 아래서만 작업한다.
 >
 > 1. `notes/.method/VERSION` 이 있는가? 없으면 **작업을 중단**하고 사용자에게
 >    폴더 신뢰 승인과 플러그인 설치를 요청한다.
 > 2. 이 세션에 `[girok] ready vX.Y.Z` 주입 블록이 있는가? 없으면 플러그인이
->    로드되지 않은 것이다 – **작업을 중단**하고 사용자에게 알린다.
+>    로드되지 않은 것이다 - **작업을 중단**하고 사용자에게 알린다.
 > 3. 플러그인을 쓸 수 없는 에이전트라면 `notes/.method/RULES.md` 를 **끝까지 읽은
 >    뒤에만** 작업한다.
 """
 
 LEGACY_POINTER = (
-    "# rc – 진행기록 지침\n\n"
+    "# rc - 진행기록 지침\n\n"
     + LEGACY_BLOCK
     + "\n## 이 저장소 고유 규칙\n\n- 배포 전에 반드시 현장 확인을 받는다.\n"
 )
@@ -614,7 +614,7 @@ def test_the_project_own_rules_survive_the_refresh(notes_repo):
 
     text = pointer.read_text(encoding="utf-8")
     assert "배포 전에 반드시 현장 확인을 받는다." in text
-    assert text.startswith("# rc – 진행기록 지침")
+    assert text.startswith("# rc - 진행기록 지침")
 
 
 def test_sync_does_not_rewrite_a_gate_that_is_already_current(notes_repo):

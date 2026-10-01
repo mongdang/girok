@@ -13,28 +13,28 @@
 ## Global Constraints
 
 - Python `>=3.10` (`pyproject.toml`). `X | None` 표기 사용 가능, `match` 는 쓰지 않는다.
-- 새 서드파티 의존성 금지 – 표준 라이브러리만.
+- 새 서드파티 의존성 금지 - 표준 라이브러리만.
 - 모든 파일 입출력은 `encoding="utf-8"`. 쓰기는 `newline="\n"` (`notes_init._write` 관례).
 - 사용자에게 보이는 모든 문자열은 **한국어**. 코드 주석과 docstring은 **영어** (기존 `scripts/*.py` 관례).
 - 테스트는 `tests/test_adopt_*.py`. `pyproject.toml` 의 `pythonpath = ["scripts", "hooks", "tests"]` 덕에 `import notes_adopt` 가 그냥 된다.
-- `tests/conftest.py` 의 `write(path, text)` 헬퍼를 쓴다 – 부모 폴더를 만들고 앞 개행을 벗긴다.
+- `tests/conftest.py` 의 `write(path, text)` 헬퍼를 쓴다 - 부모 폴더를 만들고 앞 개행을 벗긴다.
 - 기존 `notes_config._is_repository` 의 동작을 **바꾸지 않는다.** `session_report`·`check_docs`·`notes_init` 이 함께 쓰는 판정이다.
-- `git mv` 만 쓴다. `shutil.move` + `git add` 조합은 금지 – 이력이 끊긴다.
+- `git mv` 만 쓴다. `shutil.move` + `git add` 조합은 금지 - 이력이 끊긴다.
 - 파일 해시는 **SHA-1**, `hashlib.sha1(data).hexdigest()`, 바이트 그대로 (텍스트 정규화 없이).
 - 날짜 스탬프 형식은 `YYYYMMDD` (`date.today().strftime("%Y%m%d")`).
 
 ## 목차
 
 - [Task 1: 워크스페이스 판정](#task-1-워크스페이스-판정-is_workspace)
-- [Task 2: backup](#task-2-backup--원본-통째-복사와-검증)
-- [Task 3: plan](#task-3-plan--전수-목록과-role-분류)
-- [Task 4: git 정비](#task-4-git-정비--init-과-gitignore)
+- [Task 2: backup](#task-2-backup---원본-통째-복사와-검증)
+- [Task 3: plan](#task-3-plan---전수-목록과-role-분류)
+- [Task 4: git 정비](#task-4-git-정비---init-과-gitignore)
 - [Task 5: apply 사전조건과 이동](#task-5-apply-사전조건과-이동)
-- [Task 6: 병합](#task-6-병합--이어붙이기)
+- [Task 6: 병합](#task-6-병합---이어붙이기)
 - [Task 7: 링크 재작성](#task-7-링크-재작성)
 - [Task 8: verify 와 조립](#task-8-verify-와-apply-조립)
 - [Task 9: /notes 통합과 배포](#task-9-notes-통합과-배포)
-- [실행 후 확인](#실행-후-확인--eq-agent-v3-실전-검증)
+- [실행 후 확인](#실행-후-확인---eq-agent-v3-실전-검증)
 
 ---
 
@@ -47,7 +47,7 @@
 - Test: `tests/test_adopt_workspace.py`
 
 **Interfaces:**
-- Consumes: `notes_config.SKIP_DIRS` 는 없다 – 이 함수는 자체 목록을 쓴다.
+- Consumes: `notes_config.SKIP_DIRS` 는 없다 - 이 함수는 자체 목록을 쓴다.
 - Produces: `notes_config.is_workspace(root: Path) -> bool`
 
 - [ ] **Step 1: Write the failing test**
@@ -127,7 +127,7 @@ def test_the_repository_own_git_does_not_count(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_workspace.py -v`
-Expected: FAIL – `AttributeError: module 'notes_config' has no attribute 'is_workspace'`
+Expected: FAIL - `AttributeError: module 'notes_config' has no attribute 'is_workspace'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -135,7 +135,7 @@ Expected: FAIL – `AttributeError: module 'notes_config' has no attribute 'is_w
 
 ```python
 # Files that mark a folder as a project in its own right. Used only to
-# recognize a *parent* of several projects – never to require one, because a
+# recognize a *parent* of several projects - never to require one, because a
 # records repository has no manifest and rejecting those was the bug this
 # replaced.
 MANIFESTS = (
@@ -174,7 +174,7 @@ Expected: 6 passed
 - [ ] **Step 5: Verify nothing else broke**
 
 Run: `python -m pytest -q`
-Expected: 기존 테스트 전부 통과. 특히 `tests/test_wrong_folder.py` – `is_repository` 를 안 건드렸으므로 그대로여야 한다.
+Expected: 기존 테스트 전부 통과. 특히 `tests/test_wrong_folder.py` - `is_repository` 를 안 건드렸으므로 그대로여야 한다.
 
 - [ ] **Step 6: Commit**
 
@@ -190,7 +190,7 @@ is_repository 는 세션 훅·검사기가 함께 쓰는 판정이라 건드리�
 
 ---
 
-### Task 2: `backup` – 원본 통째 복사와 검증
+### Task 2: `backup` - 원본 통째 복사와 검증
 
 girok 이 이 저장소에 처음 쓰기를 하기 직전에 도는 단계. 이후 모든 단계가 이것에 기댄다.
 
@@ -201,10 +201,10 @@ girok 이 이 저장소에 처음 쓰기를 하기 직전에 도는 단계. 이�
 **Interfaces:**
 - Consumes: `notes_config.is_workspace` (Task 1)
 - Produces:
-  - `notes_adopt.BackupResult` – `path: Path`, `files: int`, `bytes: int`, `skipped: bool`
+  - `notes_adopt.BackupResult` - `path: Path`, `files: int`, `bytes: int`, `skipped: bool`
   - `notes_adopt.backup(root: Path, today: str | None = None) -> BackupResult`
-  - `notes_adopt.measure(root: Path) -> tuple[int, int]` – `(파일 수, 총 바이트)`
-  - `notes_adopt.BackupFailed` – 예외
+  - `notes_adopt.measure(root: Path) -> tuple[int, int]` - `(파일 수, 총 바이트)`
+  - `notes_adopt.BackupFailed` - 예외
 
 - [ ] **Step 1: Write the failing test**
 
@@ -215,7 +215,7 @@ girok 이 이 저장소에 처음 쓰기를 하기 직전에 도는 단계. 이�
 
 The whole point of adoption is that files move. The backup is what makes
 that reversible, so it runs before `git init`, before the skeleton, before
-anything – otherwise it captures a repository girok has already edited and
+anything - otherwise it captures a repository girok has already edited and
 calling it "the original" is a lie.
 """
 import notes_adopt
@@ -291,7 +291,7 @@ def test_measure_counts_bytes_not_just_files(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_backup.py -v`
-Expected: FAIL – `ModuleNotFoundError: No module named 'notes_adopt'`
+Expected: FAIL - `ModuleNotFoundError: No module named 'notes_adopt'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -300,7 +300,7 @@ Expected: FAIL – `ModuleNotFoundError: No module named 'notes_adopt'`
 ```python
 """Moving a repository's existing records into this methodology's layout.
 
-`notes_survey` answers the other half of this question – it proposes a
+`notes_survey` answers the other half of this question - it proposes a
 config that matches whatever the repository already does, so nothing has to
 move. This is the opposite direction: the repository moves to the standard
 layout. Both are legitimate; which one a repository wants is a person's
@@ -355,13 +355,13 @@ def measure(root: Path) -> tuple[int, int]:
 def backup(root: Path, today: str | None = None) -> BackupResult:
     """Copy the repository whole, next to itself, before anything writes.
 
-    Nothing is excluded – not `.git`, not build output. An exclusion list is
+    Nothing is excluded - not `.git`, not build output. An exclusion list is
     a list of things that cannot be restored, and disks are cheap.
     """
     root = Path(root).resolve()
     if notes_config.is_workspace(root):
         raise BackupFailed(
-            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 – "
+            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 - "
             f"하위에 프로젝트가 여럿이다. 작업할 저장소 폴더에서 다시 실행할 것"
         )
 
@@ -377,7 +377,7 @@ def backup(root: Path, today: str | None = None) -> BackupResult:
     after = measure(target)
     if before != after:
         raise BackupFailed(
-            f"백업이 원본과 다르다 – 원본 {before[0]}개/{before[1]:,}바이트, "
+            f"백업이 원본과 다르다 - 원본 {before[0]}개/{before[1]:,}바이트, "
             f"백업 {after[0]}개/{after[1]:,}바이트. 아무것도 옮기지 않았다"
         )
     return BackupResult(path=target, files=after[0], bytes=after[1])
@@ -400,7 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     verb = "이미 있음" if result.skipped else "생성"
-    print(f"[백업/{verb}] {result.path.name} – {result.files:,}개 파일 / {result.bytes:,}바이트")
+    print(f"[백업/{verb}] {result.path.name} - {result.files:,}개 파일 / {result.bytes:,}바이트")
     return 0
 
 
@@ -427,7 +427,7 @@ git init 이나 뼈대 생성 뒤에 있으면 담기는 것이 원본이 아니
 
 ---
 
-### Task 3: `plan` – 전수 목록과 role 분류
+### Task 3: `plan` - 전수 목록과 role 분류
 
 읽기 전용. 저장소의 모든 마크다운을 빠짐없이 훑어 role 초안과 SHA-1 을 붙인 매핑 파일을 만든다.
 
@@ -438,7 +438,7 @@ git init 이나 뼈대 생성 뒤에 있으면 담기는 것이 원본이 아니
 **Interfaces:**
 - Consumes: `notes_adopt.measure` (Task 2), `notes_config.load` → `cfg.notes_dir`·`cfg.board`·`cfg.decisions_dir`·`cfg.adr_style`
 - Produces:
-  - `notes_adopt.Entry` – `frm: str`, `to: str | None`, `role: str`, `sha1: str`, `bytes: int`, `why: str`, `merge: str | None`
+  - `notes_adopt.Entry` - `frm: str`, `to: str | None`, `role: str`, `sha1: str`, `bytes: int`, `why: str`, `merge: str | None`
   - `notes_adopt.plan(root: Path) -> list[Entry]`
   - `notes_adopt.write_mapping(root: Path, entries: list[Entry], backup: BackupResult | None) -> Path`
   - `notes_adopt.read_mapping(root: Path) -> dict`
@@ -453,7 +453,7 @@ git init 이나 뼈대 생성 뒤에 있으면 담기는 것이 원본이 아니
 """Listing every document and proposing where it goes.
 
 Rules fill in what they are sure about and leave the rest blank. A blank is
-not a failure – it is the handful of files a person or a model has to read,
+not a failure - it is the handful of files a person or a model has to read,
 and `apply` refuses while any remain. Guessing here would be worse than
 asking, because a wrong guess arrives as a moved file.
 """
@@ -558,7 +558,7 @@ def test_planning_moves_nothing(repo):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_plan.py -v`
-Expected: FAIL – `AttributeError: module 'notes_adopt' has no attribute 'plan'`
+Expected: FAIL - `AttributeError: module 'notes_adopt' has no attribute 'plan'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -620,7 +620,7 @@ def _classify(rel: str, cfg, decisions_prefix: str) -> tuple[str, str]:
     """The role this document plays, and why the rules think so.
 
     Only what the rules are certain about. `?` is the honest answer for the
-    rest – it costs a person one read, where a wrong guess costs a moved
+    rest - it costs a person one read, where a wrong guess costs a moved
     file and a broken link.
 
     `decisions_prefix` is the decisions folder relative to the *repository
@@ -644,14 +644,14 @@ def _classify(rel: str, cfg, decisions_prefix: str) -> tuple[str, str]:
     if "/" not in rel:
         if any(hint in name.upper() or hint in name for hint in BOARD_HINTS):
             return "board", "현황판으로 보이는 이름"
-        return "?", "루트에 있는 문서 – 자리를 규칙으로 정할 수 없다"
+        return "?", "루트에 있는 문서 - 자리를 규칙으로 정할 수 없다"
     return "doc", "일반 문서"
 
 
 def _destination(entry: Entry, cfg, notes: str) -> str | None:
     """Where this document goes, as a path relative to the repository root.
 
-    `notes` is "" when the notes folder is the repository root itself – the
+    `notes` is "" when the notes folder is the repository root itself - the
     `notesDir: "."` layout, which is a supported value and stays put.
     """
     if entry.role in ("rules", "foreign", "skip", "?"):
@@ -725,7 +725,7 @@ def read_mapping(root: Path) -> dict:
         for entry in entries:
             arrow = entry.to or "제자리"
             print(f"[{entry.role:>7}] {entry.frm} → {arrow}  ({entry.why})")
-        print(f"문서 {len(entries)}개 – 판단 필요 {len(unknown)}개")
+        print(f"문서 {len(entries)}개 - 판단 필요 {len(unknown)}개")
         return 0
 ```
 
@@ -753,7 +753,7 @@ git commit -m "feat: notes_adopt plan - 전수 목록과 role 분류
 
 ---
 
-### Task 4: git 정비 – `init` 과 `.gitignore`
+### Task 4: git 정비 - `init` 과 `.gitignore`
 
 git 이 없으면 중단하지 않고 정비를 이식의 일부로 수행한다.
 
@@ -764,7 +764,7 @@ git 이 없으면 중단하지 않고 정비를 이식의 일부로 수행한다
 **Interfaces:**
 - Consumes: `notes_config.is_workspace` (Task 1)
 - Produces:
-  - `notes_adopt.GitSetup` – `init: bool`, `gitignore_added: list[str]`, `secrets: list[str]`, `large: list[str]`, `remote: str | None`
+  - `notes_adopt.GitSetup` - `init: bool`, `gitignore_added: list[str]`, `secrets: list[str]`, `large: list[str]`, `remote: str | None`
   - `notes_adopt.git_setup(root: Path) -> GitSetup`
   - `notes_adopt.run_git(root: Path, *args: str) -> subprocess.CompletedProcess`
   - `notes_adopt.LARGE_BYTES = 10 * 1024 * 1024`
@@ -777,7 +777,7 @@ git 이 없으면 중단하지 않고 정비를 이식의 일부로 수행한다
 """Making a folder into a repository as part of adoption.
 
 Refusing until someone runs `git init` themselves turned a one-command fix
-into a stop. The interesting part is not the init – it is everything that
+into a stop. The interesting part is not the init - it is everything that
 must not land in the first commit, and saying out loud what was excluded so
 "it is in the backup only" is a written fact rather than a surprise.
 """
@@ -879,7 +879,7 @@ def test_a_missing_remote_is_reported_not_fatal(bare_project):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_gitsetup.py -v`
-Expected: FAIL – `AttributeError: module 'notes_adopt' has no attribute 'git_setup'`
+Expected: FAIL - `AttributeError: module 'notes_adopt' has no attribute 'git_setup'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -944,7 +944,7 @@ def git_setup(root: Path) -> GitSetup:
     root = Path(root).resolve()
     if notes_config.is_workspace(root):
         raise BackupFailed(
-            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 – "
+            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 - "
             f"여기서 git init 을 하면 하위 저장소를 통째로 삼킨다"
         )
 
@@ -1013,10 +1013,10 @@ git 이 없다고 멈추면 한 명령이면 될 일이 중단이 된다. 정비
 **Interfaces:**
 - Consumes: `notes_adopt.read_mapping` (Task 3), `notes_adopt.run_git` (Task 4)
 - Produces:
-  - `notes_adopt.Blocked` – 예외
-  - `notes_adopt.check_preconditions(root: Path, mapping: dict) -> None` – 위반 시 `Blocked`
+  - `notes_adopt.Blocked` - 예외
+  - `notes_adopt.check_preconditions(root: Path, mapping: dict) -> None` - 위반 시 `Blocked`
   - `notes_adopt.normalize_name(name: str, role: str, adr_style: str) -> str`
-  - `notes_adopt.move_all(root: Path, mapping: dict) -> list[tuple[str, str]]` – `(from, to)` 목록
+  - `notes_adopt.move_all(root: Path, mapping: dict) -> list[tuple[str, str]]` - `(from, to)` 목록
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1025,7 +1025,7 @@ git 이 없다고 멈추면 한 명령이면 될 일이 중단이 된다. 정비
 ```python
 """Refusing to move, and then moving.
 
-"Clean" is not `git status` being empty – an unpushed commit is fine and a
+"Clean" is not `git status` being empty - an unpushed commit is fine and a
 build artifact nobody tracks is fine. What matters is that every file about
 to move is committed, because the restore tag can only hold what was
 committed.
@@ -1154,7 +1154,7 @@ def test_names_are_normalized(name, role, style, expected):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_apply.py -v`
-Expected: FAIL – `AttributeError: module 'notes_adopt' has no attribute 'Blocked'`
+Expected: FAIL - `AttributeError: module 'notes_adopt' has no attribute 'Blocked'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1191,7 +1191,7 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     for marker in ("MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD"):
         if (git_dir / marker).exists():
             raise Blocked(
-                "병합·리베이스가 끝나지 않았다 – 반쯤 합쳐진 파일을 옮길 수는 없다. "
+                "병합·리베이스가 끝나지 않았다 - 반쯤 합쳐진 파일을 옮길 수는 없다. "
                 "먼저 마무리할 것"
             )
 
@@ -1199,7 +1199,7 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     if unresolved:
         listed = ", ".join(unresolved[:5])
         raise Blocked(
-            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 – {listed}. "
+            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 - {listed}. "
             f"role 을 채운 뒤 다시 실행할 것"
         )
 
@@ -1213,7 +1213,7 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     if dirty:
         listed = ", ".join(dirty[:5])
         raise Blocked(
-            f"옮길 문서 {len(dirty)}개가 커밋되지 않았다 – {listed}. "
+            f"옮길 문서 {len(dirty)}개가 커밋되지 않았다 - {listed}. "
             f"복원 태그는 커밋된 것만 담으므로 먼저 커밋할 것"
         )
 
@@ -1257,7 +1257,7 @@ def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
         result = run_git(root, "mv", item["from"], target)
         if result.returncode != 0:
             raise Blocked(
-                f"`{item['from']}` 를 옮기지 못했다 – {result.stderr.strip()}"
+                f"`{item['from']}` 를 옮기지 못했다 - {result.stderr.strip()}"
             )
         moved.append((item["from"], target))
     return moved
@@ -1284,7 +1284,7 @@ git commit -m "feat: notes_adopt 사전조건과 git mv 이동
 
 ---
 
-### Task 6: 병합 – 이어붙이기
+### Task 6: 병합 - 이어붙이기
 
 **Files:**
 - Modify: `scripts/notes_adopt.py`
@@ -1379,7 +1379,7 @@ def test_missing_lines_ignores_blank_lines():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_merge.py -v`
-Expected: FAIL – `AttributeError: module 'notes_adopt' has no attribute 'merge_into'`
+Expected: FAIL - `AttributeError: module 'notes_adopt' has no attribute 'merge_into'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1453,8 +1453,8 @@ git commit -m "feat: notes_adopt 병합 - 이어붙이기만 한다
 **Interfaces:**
 - Consumes: `notes_adopt._markdown` (Task 3)
 - Produces:
-  - `notes_adopt.rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int` – 고친 링크 수
-  - `notes_adopt.broken_links(root: Path) -> list[tuple[str, str]]` – `(문서, 깨진 링크)`
+  - `notes_adopt.rewrite_links(root: Path, moves: list[tuple[str, str]]) -> int` - 고친 링크 수
+  - `notes_adopt.broken_links(root: Path) -> list[tuple[str, str]]` - `(문서, 깨진 링크)`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1463,7 +1463,7 @@ git commit -m "feat: notes_adopt 병합 - 이어붙이기만 한다
 ```python
 """Keeping references pointing at documents that moved.
 
-Files surviving is what the backup guarantees. Links surviving is not – a
+Files surviving is what the backup guarantees. Links surviving is not - a
 document can be intact at its new path while every reference to it is dead,
 and no hash check notices that.
 """
@@ -1560,7 +1560,7 @@ def test_a_link_that_resolves_is_not_reported(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_links.py -v`
-Expected: FAIL – `AttributeError: module 'notes_adopt' has no attribute 'rewrite_links'`
+Expected: FAIL - `AttributeError: module 'notes_adopt' has no attribute 'rewrite_links'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1699,7 +1699,7 @@ git commit -m "feat: notes_adopt 링크 재작성
 **Interfaces:**
 - Consumes: 앞 Task 전부
 - Produces:
-  - `notes_adopt.VerifyResult` – `ok: bool`, `failures: list[str]`
+  - `notes_adopt.VerifyResult` - `ok: bool`, `failures: list[str]`
   - `notes_adopt.verify(root: Path) -> VerifyResult`
   - `notes_adopt.apply(root: Path, today: str | None = None) -> list[tuple[str, str]]`
 
@@ -1798,7 +1798,7 @@ def test_the_mapping_is_left_for_later(adopted):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_verify.py -v`
-Expected: FAIL – `AttributeError: module 'notes_adopt' has no attribute 'apply'`
+Expected: FAIL - `AttributeError: module 'notes_adopt' has no attribute 'apply'`
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1814,7 +1814,7 @@ class VerifyResult:
 
 
 def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
-    """Back up, tidy git, move, merge, and repoint – in that order.
+    """Back up, tidy git, move, merge, and repoint - in that order.
 
     The order is the design. Backing up after `git init` would capture a
     repository girok had already edited, and moving before the
@@ -1878,7 +1878,7 @@ def verify(root: Path) -> VerifyResult:
     try:
         mapping = read_mapping(root)
     except (OSError, ValueError):
-        result.fail("매핑 파일이 없다 – 무엇을 옮겼는지 알 수 없으므로 검증할 수 없다")
+        result.fail("매핑 파일이 없다 - 무엇을 옮겼는지 알 수 없으므로 검증할 수 없다")
         return result
 
     for item in mapping["files"]:
@@ -1909,12 +1909,12 @@ def verify(root: Path) -> VerifyResult:
             )
             if dropped:
                 result.fail(
-                    f"{item['from']} 의 {len(dropped)}줄이 {item['merge']} 에 없다 – "
+                    f"{item['from']} 의 {len(dropped)}줄이 {item['merge']} 에 없다 - "
                     f"첫 줄: {dropped[0][:40]}"
                 )
 
     for doc, link in broken_links(root):
-        result.fail(f"{doc} 의 링크가 깨졌다 – {link}")
+        result.fail(f"{doc} 의 링크가 깨졌다 - {link}")
     return result
 ```
 
@@ -1942,7 +1942,7 @@ def verify(root: Path) -> VerifyResult:
         for failure in result.failures:
             print(f"[실패] {failure}")
         if result.ok:
-            print("이식 검증 통과 – 유실 없음")
+            print("이식 검증 통과 - 유실 없음")
             return 0
         stamp = date.today().strftime("%Y%m%d")
         print("복원하려면:")
@@ -2037,15 +2037,15 @@ def test_the_version_was_bumped():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_adopt_command.py -v`
-Expected: FAIL – `notes_adopt.py backup` 이 `commands/notes.md` 에 없다
+Expected: FAIL - `notes_adopt.py backup` 이 `commands/notes.md` 에 없다
 
 - [ ] **Step 3: Write the documentation**
 
-`commands/notes.md` 의 `### 2. 초기화 – 스냅샷이 없을 때` 절에서, `notes_survey.py` 실행 **앞**에 다음을 넣는다:
+`commands/notes.md` 의 `### 2. 초기화 - 스냅샷이 없을 때` 절에서, `notes_survey.py` 실행 **앞**에 다음을 넣는다:
 
 ````markdown
 **먼저 백업한다.** 이 저장소에 아무것도 쓰기 전에 원본을 통째로 남긴다. `git init` 도,
-뼈대 생성도 이 뒤다 – 순서가 바뀌면 백업이 담는 것은 girok 이 이미 손댄 상태다.
+뼈대 생성도 이 뒤다 - 순서가 바뀌면 백업이 담는 것은 girok 이 이미 손댄 상태다.
 
 ```
 python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" backup
@@ -2058,7 +2058,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" backup
 같은 절의 `notes_init.py` 실행 **뒤**에 다음을 넣는다:
 
 ````markdown
-### 2-1. 이식 – 기존 기록을 girok 자리로
+### 2-1. 이식 - 기존 기록을 girok 자리로
 
 뼈대만 만들고 끝내면 진짜 문서 옆에 빈 문서 한 벌이 남는다. 기존 기록을 옮긴다.
 
@@ -2068,7 +2068,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 
 읽기 전용이다. `.claude/girok-adopt.json` 에 전수 목록과 `role` 초안이 생긴다.
 
-**`role` 이 `?` 인 항목은 규칙이 판단하지 못한 것이다. 그 문서를 직접 읽고 채운다** –
+**`role` 이 `?` 인 항목은 규칙이 판단하지 못한 것이다. 그 문서를 직접 읽고 채운다** -
 `to`(어디로) 와, 다른 문서에 합쳐야 하면 `merge`(어느 문서에) 를 적는다. 채운 결과를
 표로 사용자에게 보여주고 승인을 받는다. `?` 가 하나라도 남으면 다음 단계가 거부한다.
 
@@ -2078,20 +2078,20 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" verify
 ```
 
 `verify` 가 실패하면 **그 자리에서 복원 방법을 안내하고 멈춘다.** 스스로 고치려 들지
-않는다 – 무엇이 어긋났는지 모르는 채로 손대면 백업이 유일한 사실이 된다.
+않는다 - 무엇이 어긋났는지 모르는 채로 손대면 백업이 유일한 사실이 된다.
 
 > [!CAUTION]
 > 병합은 **이어붙이기만** 한다. 원문을 요약하거나 다시 쓰지 않는다. 다듬는 것은
 > `verify` 가 통과한 다음 세션에 사람이 볼 때 할 일이다.
 
 `notesDir` 가 `"."` 인 저장소(문서가 루트에 흩어져 있는 경우)라면 **한 번 물어볼 값이
-있다** – 문서를 `notes/` 아래로 모을 것인지. 이식은 기본적으로 현행 `notesDir` 를
+있다** - 문서를 `notes/` 아래로 모을 것인지. 이식은 기본적으로 현행 `notesDir` 를
 유지한다. 바꾸면 모든 문서 경로가 달라져 링크 재작성량이 몇 배가 되고, `notesDir: "."`
 는 girok 이 허용하는 정식 값이라 안 바꿔도 표준 위반이 아니다. **사람이 명시적으로
 원할 때만** `.claude/girok.json` 의 `notesDir` 를 먼저 고치고 `plan` 을 다시 돌린다.
 ````
 
-`### 4. 점검 – 정상일 때` 절의 명령 목록에 한 줄을 더한다:
+`### 4. 점검 - 정상일 때` 절의 명령 목록에 한 줄을 더한다:
 
 ```
 python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
@@ -2114,10 +2114,10 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 
 `.claude-plugin/plugin.json` 의 `"version"` 을 `"0.18.0"` 으로 올린다.
 
-`CHANGELOG.md` 맨 위에 추가한다 (기존 항목 형식을 그대로 따를 것 – 파일 상단을 먼저 읽고 맞춘다):
+`CHANGELOG.md` 맨 위에 추가한다 (기존 항목 형식을 그대로 따를 것 - 파일 상단을 먼저 읽고 맞춘다):
 
 ```markdown
-## v0.18.0 – 기존 기록의 인수인계
+## v0.18.0 - 기존 기록의 인수인계
 
 `/notes` 는 뼈대만 만들고 이미 있던 문서는 그 자리에 두었다. 진짜 문서 옆에 빈 문서
 한 벌이 남았고, 정리는 사람 몫이었다.
@@ -2131,7 +2131,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan
 - 병합은 이어붙이기만 한다. 재작성은 결과가 깔끔한 대신 유실을 검증할 수 없다.
 - `notes_config.is_workspace()` 를 더했다. 자동 `git init` 이 상위 폴더에서 돌면
   하위 저장소를 통째로 삼키므로, 그것만은 중단한다. 기존 `is_repository` 는
-  건드리지 않았다 – 세션 훅과 검사기가 함께 쓰는 판정이다.
+  건드리지 않았다 - 세션 훅과 검사기가 함께 쓰는 판정이다.
 ```
 
 `README.md` 의 명령·스크립트 목록에 `notes_adopt.py` 를 더한다. 파일에서 `notes_survey.py` 가 언급된 곳을 찾아 그 형식에 맞춰 한 줄 넣는다.
@@ -2160,7 +2160,7 @@ git commit -m "feat: /notes 에 이식 단계 통합 (v0.18.0)
 
 ---
 
-## 실행 후 확인 – `eq-agent-v3` 실전 검증
+## 실행 후 확인 - `eq-agent-v3` 실전 검증
 
 전 과제가 끝난 뒤, 실제 저장소에서 한 번 돌려본다. **이건 계획의 일부가 아니라 인수 검사다.**
 

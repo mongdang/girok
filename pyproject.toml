@@ -1,6 +1,6 @@
 [project]
 name = "girok"
-# Not the release version – this package is never published. The version that
+# Not the release version - this package is never published. The version that
 # matters (and must be bumped per release) is .claude-plugin/plugin.json.
 version = "0.1.0"
 description = "Documentation methodology as a Claude Code plugin"

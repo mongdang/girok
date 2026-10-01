@@ -173,6 +173,6 @@ def test_a_failed_push_is_not_reported_as_done(notes_repo):
 
 def test_a_dry_run_is_not_reported_as_done(notes_repo):
     """A dry run pushes nothing. Saying the commit reached the remote is the
-    one wrong answer here – it retires the worry the line exists for."""
+    one wrong answer here - it retires the worry the line exists for."""
     assert doc_followup.after_command(notes_repo, "git push --dry-run origin master").messages == []
     assert doc_followup.after_command(notes_repo, "git push -n origin master").messages == []

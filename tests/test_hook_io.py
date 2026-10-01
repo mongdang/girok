@@ -2,7 +2,7 @@
 
 The failure this guards against was found by accident: a payload arrived with
 a UTF-8 BOM in front of it, `json.loads` refused it, the reader returned an
-empty dict, and the hook then reported confidently on the wrong directory –
+empty dict, and the hook then reported confidently on the wrong directory -
 "the snapshot is missing" for a repository whose snapshot was right there.
 
 A check that answers the wrong question is worse than one that fails, because
@@ -49,7 +49,7 @@ def test_an_empty_payload_is_an_empty_dict(monkeypatch):
 
 def test_unreadable_input_raises_instead_of_pretending(monkeypatch, capsys):
     """The old behaviour returned {} here, and the caller then resolved cwd
-    to "." – a different repository – and reported on that one."""
+    to "." - a different repository - and reported on that one."""
     with pytest.raises(hook_io.PayloadError):
         read(monkeypatch, "{this is not json")
 

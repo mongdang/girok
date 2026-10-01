@@ -1,7 +1,7 @@
 """Noticing that a teammate has pushed something.
 
 Without this the parallel-work rules have no trigger. The merge order, the
-approval, the safety-first sequence – all of it begins with somebody
+approval, the safety-first sequence - all of it begins with somebody
 realizing there is something to merge, and realizing it by remembering to
 look is exactly what does not happen.
 
@@ -26,7 +26,7 @@ MAX_DOCUMENTS = 6
 
 # Each branch examined costs a rev-list and a diff. A repository with a long
 # tail of stale remote branches would spend the session-start budget walking
-# them, so only this many are described – the newest by commit date, which is
+# them, so only this many are described - the newest by commit date, which is
 # where a teammate's work in progress actually is.
 MAX_BRANCHES = 12
 
@@ -172,7 +172,7 @@ def summary(result: Incoming) -> list[str]:
     """
     if result.fetch_failed:
         return [
-            f"[주의] `{result.remote}` fetch 실패 – 오프라인이거나 인증 문제다. "
+            f"[주의] `{result.remote}` fetch 실패 - 오프라인이거나 인증 문제다. "
             f"상대 작업자의 새 내용이 있는지 확인하지 못했다"
         ]
     if not result.anything:
@@ -182,7 +182,7 @@ def summary(result: Incoming) -> list[str]:
     for branch in result.branches:
         bits = [f"{branch.name} 새 커밋 {branch.commits}건"]
         if branch.touches_safety:
-            bits.append("**안전 게이트 변경 포함 – 이것부터 본다**")
+            bits.append("**안전 게이트 변경 포함 - 이것부터 본다**")
         if branch.documents:
             bits.append("문서: " + ", ".join(branch.documents))
         lines.append("[반입] " + " · ".join(bits))
@@ -196,11 +196,11 @@ def summary(result: Incoming) -> list[str]:
     if result.unexamined:
         lines.append(
             f"[주의] 원격 브랜치가 많아 최근 {MAX_BRANCHES}개만 봤다 "
-            f"({result.unexamined}개 미확인) – 오래된 브랜치에 반입분이 있으면 직접 확인할 것"
+            f"({result.unexamined}개 미확인) - 오래된 브랜치에 반입분이 있으면 직접 확인할 것"
         )
 
     lines.append(
-        "병합은 승인 없이 하지 않는다 – 요약을 제시하고 진행 여부를 확인할 것. "
+        "병합은 승인 없이 하지 않는다 - 요약을 제시하고 진행 여부를 확인할 것. "
         "미루기로 하면 그 사실을 자기 현황판에 한 줄 남긴다"
     )
     return lines

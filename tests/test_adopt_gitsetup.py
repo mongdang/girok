@@ -1,7 +1,7 @@
 """Making a folder into a repository as part of adoption.
 
 Refusing until someone runs `git init` themselves turned a one-command fix
-into a stop. The interesting part is not the init – it is everything that
+into a stop. The interesting part is not the init - it is everything that
 must not land in the first commit, and saying out loud what was excluded so
 "it is in the backup only" is a written fact rather than a surprise.
 """
@@ -104,7 +104,7 @@ def test_already_committed_secrets_are_reported_not_untracked(tmp_path):
     """`.gitignore` cannot undo a commit that already happened.
 
     Reporting an already-tracked secret as "ignored" would be a false claim
-    – git keeps tracking and committing it regardless. This has to be its
+    - git keeps tracking and committing it regardless. This has to be its
     own bucket, not folded into `secrets`.
     """
     root = tmp_path / "p"
@@ -126,7 +126,7 @@ def test_a_documentation_file_is_not_mistaken_for_a_secret(tmp_path):
     """A name like `secrets-policy.md` is a document, not a credential.
 
     Silently pushing a record out of git is worse than any false negative on
-    an actual secret – this methodology's whole subject is documents.
+    an actual secret - this methodology's whole subject is documents.
     """
     root = tmp_path / "p"
     write(root / "pyproject.toml", "[project]\n")

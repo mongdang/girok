@@ -2,14 +2,14 @@
 
 Four checks, each added after the corresponding mistake reached a commit:
 
-1. **Table of contents anchors** – a hand-written TOC drifts from the
+1. **Table of contents anchors** - a hand-written TOC drifts from the
    headings it points at, leaving links that quietly stop working.
-2. **GFM table continuity** – a blank line between rows breaks the table,
+2. **GFM table continuity** - a blank line between rows breaks the table,
    and everything after it renders as plain text while still looking like a
    table in the editor.
-3. **ADR citation integrity** – citations of decisions that do not exist,
+3. **ADR citation integrity** - citations of decisions that do not exist,
    and decision files missing from their index.
-4. **Size** – documents read in full every session, measured in bytes.
+4. **Size** - documents read in full every session, measured in bytes.
 
 The slug function only approximates GitHub's, so it cannot promise that an
 anchor works on GitHub. It does reliably answer the question that matters:
@@ -38,7 +38,7 @@ TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 ADR_REF = re.compile(r"ADR-(\d{6}-[a-z0-9]+(?:-[a-z0-9]+)+|\d{3}(?!\d))")
 
 # The "numbered" style: files are NNN-slug.md. Only explicit citations count
-# – `decisions/015`, `ADR-015`, `ADR 015`. A bare number is not a citation
+# - `decisions/015`, `ADR-015`, `ADR 015`. A bare number is not a citation
 # here: every figure in the prose would look like one and the false
 # positives would bury the real findings.
 NUMBERED_REF = re.compile(r"(?:decisions/|ADR[- ])(\d{3})(?!\d)")
@@ -50,7 +50,7 @@ NUMBERED_FILE = re.compile(r"^(\d{3})-")
 #
 # The path body is ASCII only and excludes spaces on purpose. `\w` matches
 # Hangul, and with a space in the class the match ran on into the surrounding
-# prose – the "path" it reported was the rest of the sentence. `C:\Program
+# prose - the "path" it reported was the rest of the sentence. `C:\Program
 # Files\x` is reported as `C:\Program`, which is still enough to find it.
 _SEGMENT = r"[A-Za-z0-9_.$*-]"
 ABSOLUTE_PATH_RE = re.compile(
@@ -72,7 +72,7 @@ FOREIGN_ADR = re.compile(r"`[\w.-]+`\S*\s*(?:ADR-[\w-]+|decisions/\d{3}(?!\d))")
 
 # The same citation written with a space before the particle. Korean particles
 # attach to the word before them, so this is a spacing mistake rather than a
-# dead reference – and saying "존재하지 않는 … 인용" for it sent one reader
+# dead reference - and saying "존재하지 않는 … 인용" for it sent one reader
 # hunting for a bug in this checker and another deleting the particle to get
 # past it. Matched separately so the message can name the real cause.
 FOREIGN_ADR_SPACED = re.compile(
@@ -105,8 +105,8 @@ def slug(text: str) -> str:
     whitespace character becomes one hyphen.
 
     Collapsing runs of whitespace instead would hide the mistake this check
-    exists for: a header written `제목 – 부제` loses the en dash and keeps
-    both spaces, so GitHub's anchor is `제목--부제` while a hand-written TOC
+    exists for: a header written `제목 - 부제` keeps the hyphen and both
+    spaces, so GitHub's anchor is `제목---부제` while a hand-written TOC
     almost always says `제목-부제`. The link is dead and looks fine.
     """
     t = re.sub(r"[`*]", "", text)
@@ -159,7 +159,7 @@ def broken_tables(text: str) -> list[int]:
 
     A GFM table is a header row, a separator row and body rows with no blank
     line between them. A blank line mid-table leaves the rows after it as a
-    separate run with no separator – that run is the orphan reported here.
+    separate run with no separator - that run is the orphan reported here.
     """
     orphans: list[int] = []
     block: list[tuple[int, str]] = []
@@ -179,9 +179,36 @@ def _lone_carriage_returns(raw: bytes) -> int:
 
     CRLF is normal on Windows and renders fine. A lone CR is the defect: it
     splits the line, so a table cell containing one breaks the table from
-    that point on – and no editor shows it.
+    that point on - and no editor shows it.
     """
     return raw.count(b"\r") - raw.count(b"\r\n")
+
+
+# Characters that read as a dash but are not the keyboard hyphen. The rule
+# is one dash, the one every keyboard types; anything else gets copied
+# forward by the next agent that imitates the surrounding text.
+DASH_LOOKALIKES = {
+    "\u2010": "U+2010 hyphen",
+    "\u2011": "U+2011 non-breaking hyphen",
+    "\u2012": "U+2012 figure dash",
+    "\u2013": "U+2013 en dash",
+    "\u2014": "U+2014 em dash",
+    "\u2015": "U+2015 horizontal bar",
+    "\u2212": "U+2212 minus sign",
+    "\ufe58": "U+FE58 small em dash",
+    "\ufe63": "U+FE63 small hyphen-minus",
+    "\uff0d": "U+FF0D fullwidth hyphen-minus",
+}
+
+
+def _dash_lookalikes(text: str) -> dict[str, int]:
+    """Dash look-alikes in the text, keyed by name, with their counts."""
+    counts: dict[str, int] = {}
+    for ch in text:
+        name = DASH_LOOKALIKES.get(ch)
+        if name is not None:
+            counts[name] = counts.get(name, 0) + 1
+    return counts
 
 
 def _absolute_paths(text: str) -> list[str]:
@@ -204,8 +231,8 @@ def _absolute_paths(text: str) -> list[str]:
 TOC_HEADING_RE = re.compile(r"^##\s+(?:목차|Contents|Table of contents)\s*$", re.M | re.I)
 # The section ends at the next heading or the next horizontal rule. The
 # earlier form required a blank line before one of those, so a document whose
-# table of contents was the last section – or was followed by a heading with
-# no blank line – read as having none: the anchors went unchecked *and* the
+# table of contents was the last section - or was followed by a heading with
+# no blank line - read as having none: the anchors went unchecked *and* the
 # document was warned for a table of contents it already had.
 TOC_END_RE = re.compile(r"^(?:#{1,6}\s|-{3,}\s*$)", re.M)
 
@@ -294,7 +321,7 @@ def _check_toc_missing(
     if len(text.encode("utf-8")) < threshold:
         return
     result.warnings.append(
-        Problem(rel, f"`## 목차` 가 없다 ({len(text.encode('utf-8')):,}바이트) – 앵커 링크가 걸린 목차를 둘 것")
+        Problem(rel, f"`## 목차` 가 없다 ({len(text.encode('utf-8')):,}바이트) - 앵커 링크가 걸린 목차를 둘 것")
     )
 
 
@@ -311,7 +338,7 @@ def gate_table_rows(text: str):
 
     The header is found by its 확인자 and 상태 columns rather than by
     position, so a layout that adds a column still parses. Rows whose cell
-    count does not match the header are skipped – that is a broken table, and
+    count does not match the header are skipped - that is a broken table, and
     the table checks report it separately.
 
     Nothing is yielded when no header is found. Callers that must stay
@@ -334,7 +361,7 @@ def _check_gate_rows(text: str, rel: str, result: Result) -> None:
 
     This is the check the whole design exists for. An item marked CLOSED with
     an empty confirmer column is an unverified condition that reads as
-    verified – and the next person reads the badge, not the blank cell.
+    verified - and the next person reads the badge, not the blank cell.
     """
     for row, _line in gate_table_rows(text):
         if "CLOSED" not in row.get("상태", ""):
@@ -342,11 +369,11 @@ def _check_gate_rows(text: str, rel: str, result: Result) -> None:
         number = row.get("#", "?")
         if not row.get("확인자"):
             result.failures.append(
-                Problem(rel, f"게이트 #{number} 가 CLOSED 인데 확인자가 비어 있다 – 확인되지 않은 항목이 확인된 것으로 읽힌다")
+                Problem(rel, f"게이트 #{number} 가 CLOSED 인데 확인자가 비어 있다 - 확인되지 않은 항목이 확인된 것으로 읽힌다")
             )
         if not row.get("날짜"):
             result.failures.append(
-                Problem(rel, f"게이트 #{number} 가 CLOSED 인데 날짜가 비어 있다 – 언제 확인했는지 되짚을 수 없다")
+                Problem(rel, f"게이트 #{number} 가 CLOSED 인데 날짜가 비어 있다 - 언제 확인했는지 되짚을 수 없다")
             )
 
 
@@ -375,7 +402,7 @@ def check_document(
         result.failures.append(
             Problem(
                 rel,
-                f"줄바꿈이 아닌 캐리지 리턴이 {lone_cr}개 있다 – 줄이 쪼개져 표가 끊긴다. "
+                f"줄바꿈이 아닌 캐리지 리턴이 {lone_cr}개 있다 - 줄이 쪼개져 표가 끊긴다. "
                 "편집기에는 보이지 않으니 경로에 이스케이프가 실제 문자로 들어갔는지 확인할 것",
             )
         )
@@ -386,14 +413,14 @@ def check_document(
         result.failures.append(
             Problem(
                 rel,
-                "문서가 `---` 로 시작한다 – GitHub 이 Jekyll front matter 로 오인해 "
+                "문서가 `---` 로 시작한다 - GitHub 이 Jekyll front matter 로 오인해 "
                 "렌더링이 깨진다. `# 제목` 을 먼저 둘 것",
             )
         )
 
     for line_no in broken_tables(text):
         result.failures.append(
-            Problem(rel, f"표가 빈 줄로 끊김 – {line_no}번째 줄부터의 행이 표 밖 텍스트로 렌더링됨")
+            Problem(rel, f"표가 빈 줄로 끊김 - {line_no}번째 줄부터의 행이 표 밖 텍스트로 렌더링됨")
         )
 
     if path.name == GATE_NAME and cfg.modules.get("safetyGate", True):
@@ -407,15 +434,25 @@ def check_document(
         for bad in [a for a in anchors if a not in valid]:
             hint = ""
             if bad.replace("-", "") in {v.replace("-", "") for v in valid}:
-                hint = " – 헤더의 공백으로 감싼 구분 문자(` – `·` · `)가 앵커에 빈 하이픈을 남김. 앞 단어에 붙여 쓸 것"
+                hint = " - 헤더의 공백으로 감싼 구분 문자(` - `·` · `)가 앵커에 빈 하이픈을 남김. 앞 단어에 붙여 쓸 것"
             result.failures.append(Problem(rel, f"목차 앵커 `#{bad}` 에 대응하는 헤더가 없음{hint}"))
 
     for found in _absolute_paths(text):
         result.warnings.append(
             Problem(
                 rel,
-                f"문서에 로컬 절대경로가 있다 ({found}) – 머신마다 달라진다. "
+                f"문서에 로컬 절대경로가 있다 ({found}) - 머신마다 달라진다. "
                 f"저장소를 가리킬 땐 저장소 이름만 쓸 것",
+            )
+        )
+
+    dashes = _dash_lookalikes(text)
+    if dashes:
+        result.warnings.append(
+            Problem(
+                rel,
+                f"하이픈이 아닌 대시가 {sum(dashes.values())}개 있다 ({', '.join(dashes)}) - "
+                f"키보드 하이픈(-)으로 바꿀 것",
             )
         )
 
@@ -424,7 +461,7 @@ def check_document(
         size = path.stat().st_size
         if size > limit:
             result.warnings.append(
-                Problem(rel, f"{path.name} {size:,}바이트 (기준 {limit:,} 초과) – 완결된 서사를 archive/ 로 옮길 것")
+                Problem(rel, f"{path.name} {size:,}바이트 (기준 {limit:,} 초과) - 완결된 서사를 archive/ 로 옮길 것")
             )
 
 
@@ -450,7 +487,7 @@ def check_adr_citations(
         for ref in sorted(_citations(text, style) - existing):
             if ref not in forgiving:
                 message = (
-                    f"{label}{ref} 인용의 조사가 저장소명에서 떨어져 있다 – "
+                    f"{label}{ref} 인용의 조사가 저장소명에서 떨어져 있다 - "
                     f"`저장소명`의 처럼 붙여 쓸 것"
                 )
             else:
@@ -491,7 +528,7 @@ def run(start: Path | str = ".", targets: list[Path] | None = None) -> Result:
         result.failures.append(
             Problem(
                 cfg.repo_root.as_posix(),
-                "여기는 저장소가 아니다 – `.git` 이 없다. 검사한 문서가 0개다. "
+                "여기는 저장소가 아니다 - `.git` 이 없다. 검사한 문서가 0개다. "
                 "켠 폴더가 한 단계 위가 아닌지 확인하고, 아직 git 을 안 쓰는 "
                 "프로젝트라면 `git init` 을 먼저 할 것",
             )
@@ -502,7 +539,7 @@ def run(start: Path | str = ".", targets: list[Path] | None = None) -> Result:
     texts: dict[Path, str] = {}
     for path in paths:
         if not path.is_file():
-            result.warnings.append(Problem(str(path), "파일 없음 – 건너뜀"))
+            result.warnings.append(Problem(str(path), "파일 없음 - 건너뜀"))
             continue
         check_document(path, cfg, result, texts)
 
@@ -513,7 +550,7 @@ def run(start: Path | str = ".", targets: list[Path] | None = None) -> Result:
 
 def _force_utf8_output() -> None:
     """Windows consoles default to a legacy code page (cp949 on Korean
-    installs) that cannot encode the en dashes and Hangul in these messages,
+    installs) that cannot encode the Hangul in these messages,
     and the linter would die on its own output. Reconfiguring is enough;
     errors="replace" keeps a redirected pipe from crashing either.
     """

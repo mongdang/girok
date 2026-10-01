@@ -1,7 +1,7 @@
 """Listing every document and proposing where it goes.
 
 Rules fill in what they are sure about and leave the rest blank. A blank is
-not a failure – it is the handful of files a person or a model has to read,
+not a failure - it is the handful of files a person or a model has to read,
 and `apply` refuses while any remain. Guessing here would be worse than
 asking, because a wrong guess arrives as a moved file.
 """
@@ -105,7 +105,7 @@ def test_planning_moves_nothing(repo):
 
 
 def test_a_dot_folder_is_never_moved(repo):
-    # `.claude/` is read by path – a flattened copy in `docs/` is a
+    # `.claude/` is read by path - a flattened copy in `docs/` is a
     # definition Claude Code can no longer find, and `.github/` templates
     # die the same way. This tool's own subject is repositories that have
     # these folders.

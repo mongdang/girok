@@ -76,13 +76,13 @@ def check(
     pending = unpushed if unpushed is not None else unpushed_count(cfg.repo_root)
     if pending:
         report.messages.append(
-            f"미push 커밋 {pending}건 – 커밋과 push 는 한 묶음이다. 지금 자기 브랜치를 push 할 것"
+            f"미push 커밋 {pending}건 - 커밋과 push 는 한 묶음이다. 지금 자기 브랜치를 push 할 것"
         )
 
     logged = today_logged_flag if today_logged_flag is not None else is_today_logged(cfg.repo_root)
     if not logged:
         report.messages.append(
-            "현황판 일자별 작업 로그에 오늘 행이 없다 – 그날 최종적으로 남은 결과 한 줄을 남길 것"
+            "현황판 일자별 작업 로그에 오늘 행이 없다 - 그날 최종적으로 남은 결과 한 줄을 남길 것"
         )
 
     linted = check_docs.run(cfg.repo_root)

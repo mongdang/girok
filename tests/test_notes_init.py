@@ -113,7 +113,7 @@ def test_it_never_overwrites_what_is_already_there(empty_repo):
 
 
 def test_a_relative_root_works_with_an_existing_config(tmp_path, monkeypatch):
-    """`/notes` runs the CLI with --root . – a relative path – while the
+    """`/notes` runs the CLI with --root . - a relative path - while the
     config loader returns absolute paths. Comparing the two crashed init on
     every repository that already had a config; tests never saw it because
     they always pass absolute tmp paths."""
@@ -193,7 +193,7 @@ def test_it_respects_a_layout_that_is_already_configured(tmp_path):
 def test_the_pointer_names_the_layout_this_repository_actually_has(tmp_path):
     """`CLAUDE.md` exists to say where things are. It used to spell the
     default layout regardless, so a flat repository was handed a pointer to a
-    `docs/PROGRESS.md` it does not have – wrong in the one document whose
+    `docs/PROGRESS.md` it does not have - wrong in the one document whose
     whole job is being right about paths."""
     root = tmp_path / "research"
     (root / ".git").mkdir(parents=True)
@@ -242,7 +242,7 @@ def test_it_does_not_add_a_gate_document_when_the_module_is_off_in_config(tmp_pa
 
 
 def test_the_archive_folder_can_be_declined(tmp_path):
-    """One repository's rule is 'no archive folder – what was deleted is in
+    """One repository's rule is 'no archive folder - what was deleted is in
     git history'. Creating one anyway would have this plugin breaking the
     convention of the repository it was invited into."""
     import json
@@ -267,7 +267,7 @@ def test_the_archive_folder_is_created_by_default(empty_repo):
 
 
 def test_the_cli_refuses_to_write_without_naming_the_repository(tmp_path, capsys):
-    """A repository can be read-only by agreement rather than by permission –
+    """A repository can be read-only by agreement rather than by permission -
     a reference checkout, or one someone has been told not to touch. Nothing
     in the repository says so, so the caller has to name what it is about to
     write to."""
@@ -324,7 +324,7 @@ def test_it_is_written_when_the_notes_live_in_their_own_folder(empty_repo):
 
 def test_naming_a_worker_records_their_email_too(tmp_path, monkeypatch):
     """Otherwise initialization creates docs_<id>/ and the very next action
-    is blocked for an unconfirmed worker – /notes would set the repository up
+    is blocked for an unconfirmed worker - /notes would set the repository up
     and then refuse to write to it."""
     import gate_rules
 
@@ -391,7 +391,7 @@ def test_the_repository_registers_the_hooks_itself(empty_repo):
 
 def test_the_registered_wrapper_is_actually_there(empty_repo):
     """A command naming a path that does not exist registers a hook that
-    never runs, and nothing reports it – the failure this whole change is
+    never runs, and nothing reports it - the failure this whole change is
     against."""
     notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
     settings = json.loads((empty_repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
@@ -446,7 +446,7 @@ def test_the_wrapper_is_found_after_moving_into_the_repository(tmp_path, shell):
 
 def test_the_gate_says_how_to_get_the_checks_back(empty_repo):
     """A gate that stops work has to name the way out. Sending people to
-    install a plugin does not restore the hooks – the repository registers
+    install a plugin does not restore the hooks - the repository registers
     them, and `/notes` is what re-registers them."""
     notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
 

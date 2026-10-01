@@ -17,7 +17,7 @@ def main() -> int:
             return 0
         root = hook_io.cwd_of(payload)
     except hook_io.PayloadError as exc:
-        hook_io.fail_loud(f"{exc} – 이 도구 호출은 검사되지 않았다")
+        hook_io.fail_loud(f"{exc} - 이 도구 호출은 검사되지 않았다")
         return 0
 
     tool = payload.get("tool_name", "")
@@ -26,7 +26,7 @@ def main() -> int:
     try:
         decision = gate_rules.decide(root, tool, tool_input)
     except Exception as exc:  # noqa: BLE001
-        hook_io.fail_loud(f"차단 규칙 검사 실패: {exc} – 이 도구 호출은 검사되지 않았다")
+        hook_io.fail_loud(f"차단 규칙 검사 실패: {exc} - 이 도구 호출은 검사되지 않았다")
         return 0
 
     if decision.blocked:

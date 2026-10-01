@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/hero.svg" alt="girok – 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다" width="880">
+  <img src="docs/images/hero.svg" alt="girok - 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다" width="880">
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/survey.svg" alt="/notes 실행 화면 – 저장소를 읽고 설정을 제안한다" width="700">
+  <img src="docs/images/survey.svg" alt="/notes 실행 화면 - 저장소를 읽고 설정을 제안한다" width="700">
 </p>
 
 <p align="center">
@@ -48,7 +48,7 @@
 순간**부터 생긴다.
 
 이 플러그인이 나온 프로젝트에서 실제로 겪은 일이다. "빈 줄로 끊긴 GFM 표"를 잡는 검사를
-검사기에 추가했다 – 같은 실수로 이미 세 번 사고가 난 뒤였다. 그런데 그 개선은 **다른
+검사기에 추가했다 - 같은 실수로 이미 세 번 사고가 난 뒤였다. 그런데 그 개선은 **다른
 저장소로 전파되지 않았다.** 아무도 몰랐다. 지켜보는 것이 없었기 때문이다.
 
 사본은 반드시 어긋난다. 조심한다고 잡히는 문제가 아니라, 구조로 잡아야 하는 문제다.
@@ -60,14 +60,14 @@
 
 ```mermaid
 flowchart TD
-    subgraph P["① 플러그인 – 원본 하나"]
+    subgraph P["① 플러그인 - 원본 하나"]
         direction LR
         PS["skills/<br/>절차·규칙"]
         PH["hooks/<br/>이벤트 5종"]
         PL["scripts/<br/>검사기 3종"]
     end
 
-    subgraph M["② .method/ – 저장소에 커밋되는 동결 사본"]
+    subgraph M["② .method/ - 저장소에 커밋되는 동결 사본"]
         direction LR
         MR["RULES.md<br/>규칙 전문"]
         MV["VERSION<br/>판본 · 내용 해시"]
@@ -75,7 +75,7 @@ flowchart TD
         MH["hooks/<br/>훅 사본"]
     end
 
-    subgraph R["③ 저장소 – 이 프로젝트의 사실"]
+    subgraph R["③ 저장소 - 이 프로젝트의 사실"]
         direction LR
         RB["현황판"]
         RD["decisions/"]
@@ -101,7 +101,7 @@ flowchart TD
 | **플러그인 없이도 검사가 돈다** | 훅은 저장소의 `.claude/settings.json` 이 등록한다. 플러그인은 도입·갱신에만 있으면 된다 |
 | **커밋 이력에 판본이 남는다** | `.method/VERSION` 이 그 규칙이 적용된 작업과 같이 커밋된다 |
 | **어긋나면 보인다** | 세션 시작 시 스냅샷과 설치된 플러그인 판본을 대조해 알려준다 |
-| **CI가 강제한다** | 스냅샷 내용이 `VERSION` 에 적힌 해시와 맞아야 한다 – 손으로 고친 스냅샷은 push 에서 걸린다 |
+| **CI가 강제한다** | 스냅샷 내용이 `VERSION` 에 적힌 해시와 맞아야 한다 - 손으로 고친 스냅샷은 push 에서 걸린다 |
 
 > [!IMPORTANT]
 > `.method/` 는 사람이 손대지 않는다. 개정은 항상 플러그인 원본에서 하고, sync 로 내려받는다.
@@ -117,7 +117,7 @@ claude plugin install girok@mongdang
 ```
 
 Claude Code 안에서라면 `/plugin marketplace add mongdang/girok` → `/plugin install girok@mongdang`.
-설치 후 **Claude Code 를 껐다 켠다** – 훅은 세션이 시작할 때 붙는다.
+설치 후 **Claude Code 를 껐다 켠다** - 훅은 세션이 시작할 때 붙는다.
 
 이미 깔려 있다면 갱신도 같은 자리다. 설치본은 버전별 폴더에 캐시되므로 명령 없이는
 옛 사본을 계속 쓴다.
@@ -133,9 +133,9 @@ claude plugin update girok@mongdang
 > 갱신하고 `/notes` 를 돌리지 않으면 플러그인은 더 이상 훅을 들고 있지 않고 저장소에는
 > 아직 등록이 없어 **검사가 아무 데서도 돌지 않는다.** 돌린 결과(`.method/` 와
 > `.claude/settings.json`)를 커밋하면 팀원 머신에도 그대로 걸린다.
-> 0.20.0 부터는 같은 `/notes` 가 `CLAUDE.md` 의 게이트 문언까지 맞춘다 – 손으로 고쳐 쓴
+> 0.20.0 부터는 같은 `/notes` 가 `CLAUDE.md` 의 게이트 문언까지 맞춘다 - 손으로 고쳐 쓴
 > 게이트는 알아보지 못했다고 말하고 그대로 둔다.
-> 0.20.2 부터는 다른 폴더에서 연 세션을 `/cd` 로 저장소에 옮겨도 훅이 돈다 – 그 전 등록은
+> 0.20.2 부터는 다른 폴더에서 연 세션을 `/cd` 로 저장소에 옮겨도 훅이 돈다 - 그 전 등록은
 > 훅마다 `run-hook.cmd: No such file or directory` 로 실패한다. 역시 `/notes` 한 번으로 바뀐다.
 
 > [!TIP]
@@ -156,7 +156,7 @@ claude plugin update girok@mongdang
 ```
 
 `/notes` 는 뼈대를 만들기 전에 **저장소부터 읽는다.** 이미 쓰고 있는 관례에서 설정을
-추론하고, 정리할 것을 알려준다 – 현황판이 어느 파일인지, 결정 기록이 어디 있는지, 크기를
+추론하고, 정리할 것을 알려준다 - 현황판이 어느 파일인지, 결정 기록이 어디 있는지, 크기를
 넘긴 문서가 있는지. 이 단계는 읽기만 하며, 결과는 어디까지나 제안이다.
 
 ```
@@ -171,19 +171,19 @@ claude plugin update girok@mongdang
   병행 작업      끔
 
 살펴볼 것 4건:
-  - `METHOD.md` 크기가 20,090바이트로 기준(20,000)을 넘는다 – 아카이브로 옮길 때다
-  - 커밋 이메일이 4개다 – 사람이 여럿이면 병행 작업을 켜고 workers 를 채울 것
+  - `METHOD.md` 크기가 20,090바이트로 기준(20,000)을 넘는다 - 아카이브로 옮길 때다
+  - 커밋 이메일이 4개다 - 사람이 여럿이면 병행 작업을 켜고 workers 를 채울 것
   ...
 ```
 
 그다음 무엇을 만들지 확인을 받는다. 답하면 나머지는 알아서 만들어진다.
 
 <p align="center">
-  <img src="docs/images/init.svg" alt="초기화 결과 – 없던 것만 만들고 있던 파일은 유지한다" width="720">
+  <img src="docs/images/init.svg" alt="초기화 결과 - 없던 것만 만들고 있던 파일은 유지한다" width="720">
 </p>
 
 만들어진 결과는 **커밋한다.** 특히 `.claude/settings.json` 이 커밋돼야 **팀원의 머신에서
-훅이 걸린다** – 훅 등록이 그 파일에 들어 있고, 그래서 플러그인이 없는 사람에게도 같은
+훅이 걸린다** - 훅 등록이 그 파일에 들어 있고, 그래서 플러그인이 없는 사람에게도 같은
 검사가 적용된다.
 
 ### 3단계 · 작업
@@ -197,7 +197,7 @@ claude
 상태·열린 게이트 항목을 이미 파악한 상태다.
 
 <p align="center">
-  <img src="docs/images/session.svg" alt="세션 시작 화면 – 판본·작업자·현황판·게이트 상태가 이미 주입돼 있다" width="720">
+  <img src="docs/images/session.svg" alt="세션 시작 화면 - 판본·작업자·현황판·게이트 상태가 이미 주입돼 있다" width="720">
 </p>
 
 > 매일 쓰는 법·막혔을 때·문제 해결은 **[사용법 문서](docs/%EC%82%AC%EC%9A%A9%EB%B2%95.md)** 에 따로 있다.
@@ -256,8 +256,8 @@ flowchart LR
 <tr><td><code>check_docs.py</code></td><td>죽은 목차 앵커 · 빈 줄로 끊긴 표 · <b>단독 캐리지 리턴</b> · 없는 결정 인용 · 인덱스 미등재 · <b>목차 누락</b> · <b><code>---</code> 로 시작하는 문서</b> · <b>확인자·날짜 없는 CLOSED 게이트 항목</b> · 로컬 절대경로 · 문서 크기 초과</td></tr>
 <tr><td><code>marker_scan.py</code></td><td>게이트에 등재되지 않은 <code>SAFETY-STUB</code> · <code>VIRTUAL-BYPASS</code></td></tr>
 <tr><td><code>method_sync.py</code></td><td><code>.method/</code> 스냅샷 생성과 무결성 검증</td></tr>
-<tr><td><code>notes_survey.py</code></td><td>도입 전 저장소 조사 – 기존 관례에서 설정을 추론하고 정리할 것을 보고한다 (읽기 전용)</td></tr>
-<tr><td><code>notes_adopt.py</code></td><td>기존 기록을 girok 자리로 이식 – <code>backup</code>·<code>plan</code>·<code>apply</code>·<code>verify</code> 순으로 백업·목록화·이동·검증한다</td></tr>
+<tr><td><code>notes_survey.py</code></td><td>도입 전 저장소 조사 - 기존 관례에서 설정을 추론하고 정리할 것을 보고한다 (읽기 전용)</td></tr>
+<tr><td><code>notes_adopt.py</code></td><td>기존 기록을 girok 자리로 이식 - <code>backup</code>·<code>plan</code>·<code>apply</code>·<code>verify</code> 순으로 백업·목록화·이동·검증한다</td></tr>
 </table>
 
 검사기는 **커밋된 스냅샷에서** 돌기 때문에 CI에 아무것도 설치할 필요가 없다.
@@ -269,11 +269,11 @@ python <진행기록폴더>/.method/scripts/method_sync.py verify
 ```
 
 <p align="center">
-  <img src="docs/images/lint.svg" alt="검사기 출력 – 표 끊김·죽은 앵커·없는 ADR 인용·로컬 절대경로를 잡는다" width="760">
+  <img src="docs/images/lint.svg" alt="검사기 출력 - 표 끊김·죽은 앵커·없는 ADR 인용·로컬 절대경로를 잡는다" width="760">
 </p>
 
 바로 쓸 수 있는 워크플로가 [`ci/github-actions.yml`](ci/github-actions.yml) 에 있다.
-훅은 빠른 피드백, **CI가 보증**이다 – Python 이 없는 머신, 다른 에이전트, 웹 UI 편집은
+훅은 빠른 피드백, **CI가 보증**이다 - Python 이 없는 머신, 다른 에이전트, 웹 UI 편집은
 훅을 그냥 통과하기 때문이다.
 
 ## 무엇을 막고 무엇을 경고하나
@@ -286,7 +286,7 @@ python <진행기록폴더>/.method/scripts/method_sync.py verify
 | ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | 게이트 OPEN 중 실장비 모션 명령 | 사고 비용이 자동화 편익과 비교 불가 |
 | ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | 에이전트가 게이트 **확인자 칸**을 채우려는 시도 | 실장비 검증을 AI가 대신할 수 없다 |
 | ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | 마커 추가 + 같은 커밋에 게이트 등재 없음 | 등재 안 된 안전 우회가 커밋되는 것을 막는다 |
-| ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | `--force` push – **`+refspec` 형태 포함** | 변경 이력 자체가 결정 기록이다. 이유를 담으면 통과한다(아래) |
+| ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | `--force` push - **`+refspec` 형태 포함** | 변경 이력 자체가 결정 기록이다. 이유를 담으면 통과한다(아래) |
 | ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | 참고 저장소에 push | 대조·이식 출처로만 쓰는 저장소다 |
 | ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | `.method/` 직접 수정 | 손대면 사본이 다시 갈라진다 |
 | ![BLOCK](https://img.shields.io/badge/차단-C4553B?style=flat-square) | 작업자 미확정 상태의 **문서 쓰기 · 커밋 · push** | 잘못된 id 로 기록되면 병합 때 남의 기록에 섞인다 |
@@ -304,20 +304,20 @@ python <진행기록폴더>/.method/scripts/method_sync.py verify
 force push 는 막혀 있다. 정말 해야 하면 **이유를 담아** 실행한다:
 
 <p align="center">
-  <img src="docs/images/block.svg" alt="force push 차단 – 스위치가 아니라 이유를 요구한다" width="760">
+  <img src="docs/images/block.svg" alt="force push 차단 - 스위치가 아니라 이유를 요구한다" width="760">
 </p>
 
 ```bash
-GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" git push origin +master
+GIROK_FORCE_PUSH_REASON="이력 리셋 - 사용자 지시 2026-09-01" git push origin +master
 ```
 
 스위치가 아니라 이유다(8자 이상). 훅이 그 이유를 세션에 그대로 남기므로, 규칙을 어긴
-사실과 근거가 기록에 남는다. 대안이 있으면 그쪽이 낫다 – 트리 불변 커밋(`-s ours`
+사실과 근거가 기록에 남는다. 대안이 있으면 그쪽이 낫다 - 트리 불변 커밋(`-s ours`
 조상 연결)은 tip 을 원하는 커밋으로 만들면서 이력을 지우지 않는다.
 
 > [!NOTE]
 > `+master` 같은 refspec 형태도 force push 다. 처음에는 플래그만 잡아서 이 형태로
-> 가드가 뚫렸다 – 만든 사람만 아는 구멍은 없는 가드보다 나쁘다.
+> 가드가 뚫렸다 - 만든 사람만 아는 구멍은 없는 가드보다 나쁘다.
 
 ## 설정
 
@@ -351,7 +351,7 @@ GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" git push
 | `modules.archive` | `true` | "지운 건 git 히스토리에 있다" 관례면 끈다 |
 | `parallelMode` | `true` | 단독 작업 저장소면 끈다 |
 | `readOnlyRepos` | `[]` | push 를 막을 참고 저장소 목록 |
-| `skipDirs` | `[]` | 검사기가 건너뛸 폴더 – 규칙 도입 전에 쓰인 동결 산출물용 |
+| `skipDirs` | `[]` | 검사기가 건너뛸 폴더 - 규칙 도입 전에 쓰인 동결 산출물용 |
 | `limits.tocMinKB` | `1.5` | 목차를 요구하는 최소 문서 크기 |
 
 > [!NOTE]
@@ -374,7 +374,7 @@ GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" git push
 | **막히지 않는 것** | 코드 편집 (기록이 아니다) · `girok.json` 자체 (답을 적어야 하니까) · `SAFETY_GATE.md` (안전 정보는 기다리지 않는다) |
 | **해소** | 위처럼 한 줄 추가하면 그 순간부터 확정된다 |
 
-혼자 쓰는 저장소라면 `parallelMode: false` 로 두면 된다 – 이 절차 전체가 꺼진다.
+혼자 쓰는 저장소라면 `parallelMode: false` 로 두면 된다 - 이 절차 전체가 꺼진다.
 
 ### 자기 레이아웃만 고집하지 않는다
 
@@ -405,12 +405,12 @@ GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" git push
 만든다. 다른 용도로 쓰이던 `.method/` 를 잃지 않도록, **그 폴더가 이 플러그인이 만든
 것임을 `VERSION` 으로 확인하지 못하면 지우지 않고 멈춘다.**
 
-**기존 문서를 수정하는 경로도 한 곳뿐이다** – 병행 관리 문서의 `> 최종 수정:` 스탬프 한 줄.
+**기존 문서를 수정하는 경로도 한 곳뿐이다** - 병행 관리 문서의 `> 최종 수정:` 스탬프 한 줄.
 그 줄이 이미 있는 문서에만, 그 줄만 바꾸고, 파일의 줄바꿈 방식(CRLF/LF)도 그대로 둔다.
 스탬프가 없는 문서는 아예 쓰지 않는다.
 
 > [!WARNING]
-> 이 스탬프 갱신에 두 개의 버그가 있었고 v0.6.0 에서 고쳤다 – 정규식이 스탬프 **다음 빈
+> 이 스탬프 갱신에 두 개의 버그가 있었고 v0.6.0 에서 고쳤다 - 정규식이 스탬프 **다음 빈
 > 줄까지 삼켜** 갱신마다 한 줄씩 사라졌고, CRLF 파일을 LF 로 바꿔 한 줄 변경이 파일 전체
 > diff 로 보였다. 지금은 둘 다 테스트로 고정돼 있다.
 
@@ -424,13 +424,13 @@ GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" git push
 
 - **안전 게이트 항목을 닫지 않는다.** 게이트는 사람 확인자만 닫는다. 에이전트는 실장비
   검증을 대신할 수 없고, 훅은 확인자 칸을 채우는 시도 자체를 막는다.
-- **승인 없이 병합하지 않는다.** 문서 자동 병합은 의도적으로 미뤄 둔 2차 과제다 –
+- **승인 없이 병합하지 않는다.** 문서 자동 병합은 의도적으로 미뤄 둔 2차 과제다 -
   위험은 대부분 거기에 있는데, 정작 이 프로젝트가 풀려는 문제와는 무관하기 때문이다.
 - **사람의 실수까지 막아 주지는 못한다.** 훅은 에이전트가 실행하는 경로만 본다. 사람이
   장비 콘솔에서 직접 축을 움직이는 것은 아무것도 막지 못한다.
 - **무엇을 기록할지는 정해 주지 않는다.** 어디에 어떤 형식으로 남길지만 정한다.
 - **저장소 안의 위조까지 잡지는 못한다.** CI 의 `verify` 는 스냅샷이 자기 `VERSION` 과
-  맞는지를 본다. 훅과 해시를 **함께** 고치면 통과한다 – CI 에는 플러그인이 없어서 원본과
+  맞는지를 본다. 훅과 해시를 **함께** 고치면 통과한다 - CI 에는 플러그인이 없어서 원본과
   대조할 수단이 없기 때문이다. 원본과 같음을 보증하는 것은 플러그인이 있는 머신의 `sync`
   이고, 저장소에 커밋된 코드를 실행하는 결정은 폴더 신뢰 승인이다. 신뢰하지 않는 저장소는
   신뢰하지 말 것.
@@ -441,10 +441,10 @@ GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" git push
 
 Python 이 없는 머신에서는 훅이 돌지 않는다. 래퍼가 그 사실을 stderr 로 말하고 끝내며,
 세션 시작 블록이 뜨지 않으므로 `CLAUDE.md` 게이트가 작업을 멈춘다. 그 환경에 남는 것은
-규칙 전문(사람이 읽고 따르는 것)과 CI(사후 거부)뿐이다 – 사전 차단은 없다.
+규칙 전문(사람이 읽고 따르는 것)과 CI(사후 거부)뿐이다 - 사전 차단은 없다.
 
 훅도 검사기도 전부 Python 이고, 진입점은 bash·cmd.exe·PowerShell 셋 다에서 도는 폴리글롯
-래퍼다 – Git Bash 가 없는 Windows 에서 Claude Code 가 PowerShell 로 훅을 띄우는 경우까지
+래퍼다 - Git Bash 가 없는 Windows 에서 Claude Code 가 PowerShell 로 훅을 띄우는 경우까지
 포함해 세 경로를 전부 실측했다. 래퍼는 인터프리터를 이름만 보고 고르지 않고 **직접
 실행해** 확인한다. Windows 에서 `python3` 는 보통 인터프리터가 아니라 Microsoft Store
 바로가기로 잡히는데, 그걸 골랐다가 훅이 조용히 전부 죽었던 적이 있기 때문이다.
@@ -456,7 +456,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-CI는 Linux와 Windows 양쪽에서 돈다. 줄바꿈, 콘솔 인코딩, 인터프리터 탐색 – 셋 다 두
+CI는 Linux와 Windows 양쪽에서 돈다. 줄바꿈, 콘솔 인코딩, 인터프리터 탐색 - 셋 다 두
 환경에서 다르게 동작했고, 그 차이를 사용자보다 테스트가 먼저 찾아냈다.
 
 > [!IMPORTANT]
@@ -469,4 +469,4 @@ CI는 Linux와 Windows 양쪽에서 돈다. 줄바꿈, 콘솔 인코딩, 인터�
 
 ## 라이선스
 
-MIT – [LICENSE](LICENSE)
+MIT - [LICENSE](LICENSE)

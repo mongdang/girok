@@ -14,7 +14,7 @@ def main() -> int:
         payload = hook_io.read_payload()
         root = hook_io.cwd_of(payload)
     except hook_io.PayloadError as exc:
-        hook_io.fail_loud(f"{exc} – 이 세션에는 규칙 검사가 적용되지 않았다")
+        hook_io.fail_loud(f"{exc} - 이 세션에는 규칙 검사가 적용되지 않았다")
         return 0
 
     try:

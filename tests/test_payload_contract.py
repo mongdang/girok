@@ -3,9 +3,9 @@
 Three field names were wrong at once, and every test agreed with the code
 because the tests fed the same invented names. Green meant nothing:
 
-- `user_input` instead of `prompt` – the safety-gate injection never fired
-- `tool_result` instead of `tool_response` – a failed push read as done
-- `notes_dir.relative_to(root)` on an unresolved root – crashed on `--root .`
+- `user_input` instead of `prompt` - the safety-gate injection never fired
+- `tool_result` instead of `tool_response` - a failed push read as done
+- `notes_dir.relative_to(root)` on an unresolved root - crashed on `--root .`
 
 The fix is structural rather than three edits: field access lives in
 `hook_io`, with the real name recorded next to the evidence for it, and the
@@ -34,7 +34,7 @@ def test_the_prompt_field_is_prompt():
 
 
 def test_the_old_name_still_works_as_a_fallback():
-    """Kept so a harness that sends the other name is not silently ignored –
+    """Kept so a harness that sends the other name is not silently ignored -
     being wrong once about this cost the safety injection entirely."""
     assert hook_io.prompt_of({"user_input": "원점복귀 해줘"}) == "원점복귀 해줘"
 
@@ -110,5 +110,5 @@ def test_no_hook_reads_a_payload_field_directly(script):
     text = script.read_text(encoding="utf-8")
 
     assert not RAW_ACCESS.search(text), (
-        f"{script.name} 이 payload 필드를 직접 읽는다 – hook_io 의 접근자를 쓸 것"
+        f"{script.name} 이 payload 필드를 직접 읽는다 - hook_io 의 접근자를 쓸 것"
     )

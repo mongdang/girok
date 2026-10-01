@@ -72,7 +72,7 @@ def notes_repo(tmp_path):
     write(
         root / "notes" / "docs" / "decisions" / "ADR-001-first.md",
         """
-# ADR-001 – 첫 결정
+# ADR-001 - 첫 결정
 
 | | |
 |---|---|

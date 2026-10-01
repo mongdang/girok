@@ -1,6 +1,6 @@
 """Moving a repository's existing records into this methodology's layout.
 
-`notes_survey` answers the other half of this question – it proposes a
+`notes_survey` answers the other half of this question - it proposes a
 config that matches whatever the repository already does, so nothing has to
 move. This is the opposite direction: the repository moves to the standard
 layout. Both are legitimate; which one a repository wants is a person's
@@ -46,7 +46,7 @@ class BackupResult:
 def _size_map(root: Path) -> dict[str, int]:
     """Every file under `root`, by relative path, with its size.
 
-    The distribution matters as much as the totals – two trees can agree on
+    The distribution matters as much as the totals - two trees can agree on
     file count and total bytes while disagreeing on which file holds what.
     """
     sizes: dict[str, int] = {}
@@ -72,7 +72,7 @@ def _diff_message(before: dict[str, int], after: dict[str, int]) -> str:
     differing = sorted(p for p in set(before) & set(after) if before[p] != after[p])
     first = (missing + differing)[0]
     return (
-        f"백업이 원본과 다르다 – 빠진 경로 {len(missing)}개, "
+        f"백업이 원본과 다르다 - 빠진 경로 {len(missing)}개, "
         f"크기가 다른 경로 {len(differing)}개, 첫 항목 `{first}`"
     )
 
@@ -80,7 +80,7 @@ def _diff_message(before: dict[str, int], after: dict[str, int]) -> str:
 def backup(root: Path, today: str | None = None) -> BackupResult:
     """Copy the repository whole, next to itself, before anything writes.
 
-    Nothing is excluded – not `.git`, not build output. An exclusion list is
+    Nothing is excluded - not `.git`, not build output. An exclusion list is
     a list of things that cannot be restored, and disks are cheap.
 
     The copy lands at a `.partial` name first and is only renamed to the
@@ -91,7 +91,7 @@ def backup(root: Path, today: str | None = None) -> BackupResult:
     root = Path(root).resolve()
     if notes_config.is_workspace(root):
         raise BackupFailed(
-            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 – "
+            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 - "
             f"하위에 프로젝트가 여럿이다. 작업할 저장소 폴더에서 다시 실행할 것"
         )
 
@@ -110,7 +110,7 @@ def backup(root: Path, today: str | None = None) -> BackupResult:
         shutil.copytree(root, partial, symlinks=True)
     except Exception as exc:
         raise BackupFailed(
-            f"백업 복사 중 오류가 났다 – {exc}. {partial.name} 에 중간 상태가 남아있으니 확인할 것"
+            f"백업 복사 중 오류가 났다 - {exc}. {partial.name} 에 중간 상태가 남아있으니 확인할 것"
         ) from exc
 
     before = _size_map(root)
@@ -136,7 +136,7 @@ GATE_NAME = "SAFETY_GATE.md"
 
 # Every name girok's own code looks up literally rather than by search.
 # Normalizing one does not rename a document, it switches off whatever reads
-# it – a `safety-gate.md` reads as "no gate", which reads as "nothing OPEN",
+# it - a `safety-gate.md` reads as "no gate", which reads as "nothing OPEN",
 # which lets a real motion command through. Anything added here has to be a
 # name some tool opens directly.
 FIXED_NAMES = ROOT_FIXED + (GATE_NAME,)
@@ -195,7 +195,7 @@ def _classify(rel: str, cfg, decisions_prefix: str, workers: tuple = ()) -> tupl
     """The role this document plays, and why the rules think so.
 
     Only what the rules are certain about. `?` is the honest answer for the
-    rest – it costs a person one read, where a wrong guess costs a moved
+    rest - it costs a person one read, where a wrong guess costs a moved
     file and a broken link.
 
     `decisions_prefix` is the decisions folder relative to the *repository
@@ -212,9 +212,9 @@ def _classify(rel: str, cfg, decisions_prefix: str, workers: tuple = ()) -> tupl
     # `.claude/commands`, `.github/` templates, `.superpowers/` ledgers.
     # Flattening one into `docs/` deletes the feature, not just the file.
     if rel.split("/", 1)[0].startswith("."):
-        return "foreign", "점(.)으로 시작하는 도구 폴더 – 경로로 읽힌다"
+        return "foreign", "점(.)으로 시작하는 도구 폴더 - 경로로 읽힌다"
     if any(rel == w or rel.startswith(w + "/") for w in workers):
-        return "worker", "병행 작업 개인 폴더 – 공용 문서와 섞지 않는다"
+        return "worker", "병행 작업 개인 폴더 - 공용 문서와 섞지 않는다"
     if any(rel.startswith(d + "/") for d in FOREIGN_DIRS):
         return "foreign", "다른 도구가 경로로 읽는 폴더"
     if cfg.board and name == cfg.board:
@@ -229,19 +229,19 @@ def _classify(rel: str, cfg, decisions_prefix: str, workers: tuple = ()) -> tupl
     if "/" not in rel:
         if any(hint in name.upper() or hint in name for hint in BOARD_HINTS):
             return "board", "현황판으로 보이는 이름"
-        return "?", "루트에 있는 문서 – 자리를 규칙으로 정할 수 없다"
+        return "?", "루트에 있는 문서 - 자리를 규칙으로 정할 수 없다"
     return "doc", "일반 문서"
 
 
 def _destination(entry: Entry, cfg, notes: str) -> str | None:
     """Where this document goes, as a path relative to the repository root.
 
-    `notes` is "" when the notes folder is the repository root itself – the
+    `notes` is "" when the notes folder is the repository root itself - the
     `notesDir: "."` layout, which is a supported value and stays put.
 
     The destinations are girok's standard layout rather than whatever
     `docRoots`/`decisionsDir` currently say, because moving the repository
-    onto the standard is what this command is for – `update_config` then
+    onto the standard is what this command is for - `update_config` then
     rewrites the config so it describes where the files actually are.
 
     `keep` is a person's answer to a `?`: read it, decided it stays. It
@@ -347,7 +347,7 @@ JUNK_PATTERNS = (
 
 # Names that usually hold a credential. Ignoring one is cheap; committing
 # one is a rotation. The prefixes end in "." so a document like
-# `secrets-policy.md` does not fall in – only `secrets.<ext>` does.
+# `secrets-policy.md` does not fall in - only `secrets.<ext>` does.
 SECRET_NAMES = (".env",)
 SECRET_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
 SECRET_PREFIXES = ("credentials.", "secrets.", ".env.")
@@ -399,7 +399,7 @@ def _tracked_files(root: Path) -> set[str]:
 def _files_under(root: Path):
     """Every file under `root`, `.git` pruned before descending into it.
 
-    `.git` holds the object database – on a repository with real history
+    `.git` holds the object database - on a repository with real history
     that is most of the tree, and `git_setup` has no business reading it.
     """
     for dirpath, dirnames, filenames in os.walk(root):
@@ -418,13 +418,13 @@ def git_setup(root: Path) -> GitSetup:
 
     This computes and returns; it does not print. `main()` is the only
     place in this module that owns stdout, so a caller reads
-    `result.already_tracked` and reports it – telling the person that
+    `result.already_tracked` and reports it - telling the person that
     `.gitignore` cannot undo a commit that already happened.
     """
     root = Path(root).resolve()
     if notes_config.is_workspace(root):
         raise BackupFailed(
-            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 – "
+            f"`{root.name}` 는 저장소가 아니라 워크스페이스로 보인다 - "
             f"여기서 git init 을 하면 하위 저장소를 통째로 삼킨다"
         )
 
@@ -467,7 +467,7 @@ def _read_document(path: Path, root: Path) -> str:
     """Read a markdown document, or stop with its name.
 
     One `.md` saved in cp949 used to end the whole run in a
-    `UnicodeDecodeError` that did not say which file – at a point where a
+    `UnicodeDecodeError` that did not say which file - at a point where a
     backup and a restore tag already exist. Anything unreadable is a
     `Blocked` naming the path, like every other refusal here.
     """
@@ -475,12 +475,12 @@ def _read_document(path: Path, root: Path) -> str:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         raise Blocked(
-            f"`{path.relative_to(root).as_posix()}` 를 UTF-8 로 읽지 못했다 – {exc.reason}. "
+            f"`{path.relative_to(root).as_posix()}` 를 UTF-8 로 읽지 못했다 - {exc.reason}. "
             f"이 파일을 UTF-8 로 다시 저장한 뒤 다시 실행할 것"
         ) from exc
     except OSError as exc:
         raise Blocked(
-            f"`{path.relative_to(root).as_posix()}` 를 읽지 못했다 – {exc}"
+            f"`{path.relative_to(root).as_posix()}` 를 읽지 못했다 - {exc}"
         ) from exc
 
 
@@ -492,7 +492,7 @@ def _porcelain(root: Path) -> dict[str, str]:
 
     A rename (`R  old -> new`) records under both names: someone may have
     run `git mv` by hand before this ever looks, and the mapping's `from`
-    still names the old path – only recording the new one would let that
+    still names the old path - only recording the new one would let that
     file slip past the gate and die later, inside `move_all`, on a git
     error nobody can read.
 
@@ -529,7 +529,7 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     for marker in ("MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD"):
         if (git_dir / marker).exists():
             raise Blocked(
-                "병합·리베이스가 끝나지 않았다 – 반쯤 합쳐진 파일을 옮길 수는 없다. "
+                "병합·리베이스가 끝나지 않았다 - 반쯤 합쳐진 파일을 옮길 수는 없다. "
                 "먼저 마무리할 것"
             )
 
@@ -537,19 +537,19 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     if unresolved:
         listed = ", ".join(unresolved[:5])
         raise Blocked(
-            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 – {listed}. "
+            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 - {listed}. "
             f"role 을 채운 뒤 다시 실행할 것"
         )
 
     states = _porcelain(root)
     # A merge target is about to be appended to and its source deleted, so
-    # the restore tag has to hold it – even when the target itself never
+    # the restore tag has to hold it - even when the target itself never
     # moves and so carries no `to` of its own.
     targets = {f["merge"] for f in mapping["files"] if f.get("merge")}
     dirty = []
     for item in mapping["files"]:
         # Only what adoption is about to touch. A half-finished edit to
-        # `CLAUDE.md`, which never moves, is ordinary work – blocking on it
+        # `CLAUDE.md`, which never moves, is ordinary work - blocking on it
         # would make the gate about tidiness instead of about what the
         # restore tag can bring back (spec §4: "이식 대상 밖은 통과").
         if (
@@ -564,7 +564,7 @@ def check_preconditions(root: Path, mapping: dict) -> None:
     if dirty:
         listed = ", ".join(dirty[:5])
         raise Blocked(
-            f"옮길 문서 {len(dirty)}개가 커밋되지 않았다 – {listed}. "
+            f"옮길 문서 {len(dirty)}개가 커밋되지 않았다 - {listed}. "
             f"복원 태그는 커밋된 것만 담으므로 먼저 커밋할 것"
         )
 
@@ -574,7 +574,7 @@ def normalize_name(name: str, role: str, adr_style: str) -> str:
 
     Korean names are kept as they are: transliterating them would trade a
     name that means something for one that does not. A name girok itself
-    opens literally is kept for a harder reason – see `FIXED_NAMES`.
+    opens literally is kept for a harder reason - see `FIXED_NAMES`.
     """
     if name in FIXED_NAMES:
         return name
@@ -602,7 +602,7 @@ def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
     """Move every planned document with `git mv`, so history follows.
 
     This only stages the renames. The move alone leaves links between
-    documents broken – merging and link rewriting still have to happen –
+    documents broken - merging and link rewriting still have to happen -
     so committing here would bury that half-finished state in history
     permanently. `apply` commits once, after everything is done.
     """
@@ -617,7 +617,7 @@ def move_all(root: Path, mapping: dict) -> list[tuple[str, str]]:
         result = run_git(root, "mv", item["from"], target)
         if result.returncode != 0:
             raise Blocked(
-                f"`{item['from']}` 를 옮기지 못했다 – {result.stderr.strip()}"
+                f"`{item['from']}` 를 옮기지 못했다 - {result.stderr.strip()}"
             )
         moved.append((item["from"], target))
     return moved
@@ -649,7 +649,7 @@ def merge_into(
 
     A missing target is a refusal, not an empty head. Treating it as ""
     created a brand new file at the target path holding only the source's
-    body – and `verify`, which only checks that the target exists and
+    body - and `verify`, which only checks that the target exists and
     contains the lines, passed. The document that was supposed to receive
     the content got nothing. `moved_to` is where the mapping says that
     document went, so the message can say what to write instead.
@@ -660,10 +660,10 @@ def merge_into(
 
     if not dst.is_file():
         hint = (
-            f" – 매핑을 보면 그 문서는 `{moved_to}` 로 옮겨졌다. "
+            f" - 매핑을 보면 그 문서는 `{moved_to}` 로 옮겨졌다. "
             f"`merge` 에는 이동 후 경로를 적을 것"
             if moved_to else
-            " – `merge` 에는 이동 후 경로를 적고, 대상 문서가 실제로 있는지 확인할 것"
+            " - `merge` 에는 이동 후 경로를 적고, 대상 문서가 실제로 있는지 확인할 것"
         )
         raise Blocked(
             f"`{source}` 를 병합할 대상 `{target}` 가 없다{hint}. "
@@ -685,24 +685,24 @@ def merge_into(
     if result.returncode != 0:
         if source in _tracked_files(root):
             # git knows this file and refused to drop it (lock, permission,
-            # a broken .git) – its content is already appended into `target`,
+            # a broken .git) - its content is already appended into `target`,
             # so deleting it now would desync the index from the working
             # tree. Stop and let a person sort out git's state.
             raise Blocked(
-                f"`{source}` 를 git에서 지우지 못했다 – {result.stderr.strip()}\n"
+                f"`{source}` 를 git에서 지우지 못했다 - {result.stderr.strip()}\n"
                 f"내용은 이미 `{target}` 에 이어붙었으니, `{source}` 상태를 확인한 뒤 직접 정리할 것"
             )
-        # Never tracked, so git has nothing to lose track of – its content
+        # Never tracked, so git has nothing to lose track of - its content
         # is already in `target`, so a plain filesystem delete is safe.
         src.unlink(missing_ok=True)
 
 
-# `[text](` / `![alt](` – only the opening. The destination itself is
+# `[text](` / `![alt](` - only the opening. The destination itself is
 # hand-scanned by `_parse_dest` because it may be wrapped in `<...>`, hold a
 # literal space, or nest one level of parens: shapes no single character
 # class captures without either missing them or truncating them.
 INLINE_LINK = re.compile(r"!?\[[^\]]*\]\(")
-# Reference-style definitions `[label]: path` – destinations here are never
+# Reference-style definitions `[label]: path` - destinations here are never
 # angle-wrapped or spaced in practice, so a plain character class is enough.
 REFERENCE_LINK = re.compile(r"(^\s*\[[^\]]+\]:\s+)([^\s#]+)((?:#\S*)?)", re.MULTILINE)
 FENCE = re.compile(r"^\s*(```|~~~)")
@@ -730,7 +730,7 @@ def _outside_code(text: str):
 def _parse_dest(text: str, pos: int):
     """Parse a link destination starting at `text[pos]`, right after `](`.
 
-    Returns `(dest, anchor, title, angled, end)` – `end` is the index just
+    Returns `(dest, anchor, title, angled, end)` - `end` is the index just
     past the closing `)`. Returns `None` if no closing `)` is found; a
     destination this can't close is one it can't vouch for either, so the
     caller must not report it as a link at all, let alone a broken one.
@@ -808,7 +808,7 @@ def _retarget(
 ) -> str | None:
     """The new relative link, or None if this one needs no change.
 
-    `link` is percent-decoded before it is matched against the moves table –
+    `link` is percent-decoded before it is matched against the moves table -
     `my%20file.md` and `my file.md` name the same file. The anchor rides
     along separately and is never touched by this.
 
@@ -817,7 +817,7 @@ def _retarget(
     from the old parent and has to be written relative to the new one.
     Resolving from the new parent instead looks up a path the moves table
     has never heard of, which is why link rewriting silently did nothing in
-    exactly the case it exists for – `decisions/` becoming
+    exactly the case it exists for - `decisions/` becoming
     `docs/decisions/`.
     """
     if EXTERNAL.match(link):
@@ -891,7 +891,7 @@ def rewrite_links(
 
     Returns the repository-root-relative paths of documents this actually
     wrote, sorted. The caller (`apply`) needs exactly this list to scope its
-    final commit, and this function already knows it – recomputing it from
+    final commit, and this function already knows it - recomputing it from
     outside by re-hashing the tree would be the same answer, done twice.
     """
     root = Path(root).resolve()
@@ -946,7 +946,7 @@ def rewrite_links(
 def broken_links(root: Path) -> list[tuple[str, str]]:
     """Relative links that point at nothing.
 
-    A destination `_parse_dest` could not close is skipped, not reported –
+    A destination `_parse_dest` could not close is skipped, not reported -
     a false "broken" kills the signal `verify` depends on.
     """
     root = Path(root).resolve()
@@ -1045,7 +1045,7 @@ def update_config(root: Path, mapping: dict) -> dict:
 
     Only keys adoption actually made true are touched, and only when they
     disagree. `docRoots` gains `docs` at the front rather than being
-    replaced – documents landed there, but the roots the repository already
+    replaced - documents landed there, but the roots the repository already
     declared are not ours to drop.
     """
     root = Path(root).resolve()
@@ -1081,7 +1081,7 @@ def update_config(root: Path, mapping: dict) -> dict:
     # `doc_roots_relative[0]`, and that is where the gate hook, the linter
     # and the marker scan open `SAFETY_GATE.md` by name. A config listing
     # `["documents", "docs"]` left them reading `documents/SAFETY_GATE.md`
-    # after the gate had moved to `docs/` – no gate, nothing OPEN, real
+    # after the gate had moved to `docs/` - no gate, nothing OPEN, real
     # motion commands through, and `verify` passing.
     if (
         any(t.startswith(f"{notes}{docs}/") for t in landed)
@@ -1099,7 +1099,7 @@ def update_config(root: Path, mapping: dict) -> dict:
 
 
 def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
-    """Back up, tidy git, move, merge, and repoint – in that order.
+    """Back up, tidy git, move, merge, and repoint - in that order.
 
     The order is the design. Checking preconditions after committing
     everything would make the gate vacuous, and worse: in a repository that
@@ -1114,7 +1114,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     mapping_path = root / MAPPING_RELATIVE
     if not mapping_path.is_file():
         raise Blocked(
-            "매핑이 없다 – 먼저 `plan` 을 돌려 제안을 확인하고, "
+            "매핑이 없다 - 먼저 `plan` 을 돌려 제안을 확인하고, "
             "자리가 안 정해진(`?`) 문서의 role 을 채운 뒤 다시 실행할 것"
         )
     mapping = read_mapping(root)
@@ -1123,7 +1123,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     if unresolved:
         listed = ", ".join(unresolved[:5])
         raise Blocked(
-            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 – {listed}. "
+            f"자리가 안 정해진 문서가 {len(unresolved)}개 있다 - {listed}. "
             f"role 을 채운 뒤 다시 실행할 것"
         )
 
@@ -1137,7 +1137,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         run_git(root, "add", "-A")
         run_git(root, "commit", "-m", "chore: girok 이식 전 상태")
     elif setup.gitignore_added:
-        # A pre-existing repository may hold unrelated, uncommitted work –
+        # A pre-existing repository may hold unrelated, uncommitted work -
         # `git add -A` here would sweep it into our commit. Only what we
         # just wrote goes in.
         run_git(root, "add", "--", ".gitignore")
@@ -1145,8 +1145,8 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     tag = f"girok-adopt-before-{stamp}"
     run_git(root, "tag", tag)
 
-    # Recorded now rather than at the end, so a `verify` run days later –
-    # or after a failure below – names the tag that exists instead of
+    # Recorded now rather than at the end, so a `verify` run days later -
+    # or after a failure below - names the tag that exists instead of
     # rebuilding one out of today's date.
     mapping["tag"] = tag
     mapping["backup"] = {
@@ -1155,8 +1155,8 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     _write_mapping_payload(root, mapping)
 
     # From here on, the safety net (backup folder + restore tag) already
-    # exists. If anything below fails – a collision, a self-merge, a
-    # `git mv`/`git rm` failure mid-move, an unreadable file, a full disk –
+    # exists. If anything below fails - a collision, a self-merge, a
+    # `git mv`/`git rm` failure mid-move, an unreadable file, a full disk -
     # the person is mid-operation with some files possibly already moved.
     # Attaching the tag and backup name to the exception lets `main()` tell
     # them exactly how to undo it, instead of leaving them to guess whether
@@ -1167,7 +1167,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
             target = item.get("to")
             # The board's destination ("PROGRESS.md") is this methodology's
             # own fixed name, not derived from whatever the person called
-            # it – there is nothing of theirs left in it to normalize.
+            # it - there is nothing of theirs left in it to normalize.
             if not target or item["role"] == "board":
                 continue
             parent = Path(target).parent
@@ -1181,7 +1181,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         for dest, sources in destinations.items():
             if len(sources) > 1:
                 raise Blocked(
-                    f"{len(sources)}개 문서가 정규화 후 같은 자리로 겹친다 – "
+                    f"{len(sources)}개 문서가 정규화 후 같은 자리로 겹친다 - "
                     f"{', '.join(sources)} 모두 `{dest}` 가 된다. 이름을 정리하고 "
                     f"다시 실행할 것 (자동으로 번호를 붙여 해결하지 않는다)"
                 )
@@ -1189,7 +1189,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
         for item in mapping["files"]:
             if item.get("merge") and item["merge"] == item["from"]:
                 raise Blocked(
-                    f"`{item['from']}` 를 자기 자신에 병합할 수 없다 – 내용을 이어붙인 뒤 "
+                    f"`{item['from']}` 를 자기 자신에 병합할 수 없다 - 내용을 이어붙인 뒤 "
                     f"원본을 지우면 문서가 그대로 사라진다"
                 )
 
@@ -1228,9 +1228,9 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
             exc.backup_name = saved.path.name
         except AttributeError:
             # An exception type that refuses attributes must not turn into
-            # the failure that gets reported – the original error and the
+            # the failure that gets reported - the original error and the
             # safety net are what the person needs. `Blocked` carries both.
-            blocked = Blocked(f"이식 중 오류가 났다 – {type(exc).__name__}: {exc}")
+            blocked = Blocked(f"이식 중 오류가 났다 - {type(exc).__name__}: {exc}")
             blocked.tag = tag
             blocked.backup_name = saved.path.name
             raise blocked from exc
@@ -1246,7 +1246,7 @@ def apply(root: Path, today: str | None = None) -> list[tuple[str, str]]:
     _write_mapping_payload(root, mapping)
 
     if setup.init:
-        # Nothing existed before girok touched this folder – there is no
+        # Nothing existed before girok touched this folder - there is no
         # unrelated work to sweep in.
         run_git(root, "add", "-A")
     else:
@@ -1270,7 +1270,7 @@ def verify(root: Path) -> VerifyResult:
     try:
         mapping = read_mapping(root)
     except (OSError, ValueError):
-        result.fail("매핑 파일이 없다 – 무엇을 옮겼는지 알 수 없으므로 검증할 수 없다")
+        result.fail("매핑 파일이 없다 - 무엇을 옮겼는지 알 수 없으므로 검증할 수 없다")
         return result
 
     result.tag = mapping.get("tag")
@@ -1301,13 +1301,13 @@ def verify(root: Path) -> VerifyResult:
             continue
 
         # `apply` repointed a link inside this document, so it cannot be
-        # byte-identical. The narrower promise – nothing but link
-        # destinations changed – is checked against the untouched backup,
+        # byte-identical. The narrower promise - nothing but link
+        # destinations changed - is checked against the untouched backup,
         # the one copy that cannot have been rewritten by anything here.
         original = backup_path / item["from"] if backup_path else None
         if original is None or not original.is_file():
             result.fail(
-                f"{landed} 는 링크가 재작성돼 원본과 바이트가 다르다 – "
+                f"{landed} 는 링크가 재작성돼 원본과 바이트가 다르다 - "
                 f"백업의 {item['from']} 가 없어 나머지 내용이 그대로인지 대조할 수 없다"
             )
             continue
@@ -1327,7 +1327,7 @@ def verify(root: Path) -> VerifyResult:
             dropped = missing_lines(before, now)
             if dropped:
                 result.fail(
-                    f"{landed} 에서 원본({item['from']})의 {len(dropped)}줄이 사라졌다 – "
+                    f"{landed} 에서 원본({item['from']})의 {len(dropped)}줄이 사라졌다 - "
                     f"첫 줄: {dropped[0][:40]}"
                 )
         elif before != now:
@@ -1350,7 +1350,7 @@ def verify(root: Path) -> VerifyResult:
             )
             if dropped:
                 result.fail(
-                    f"{item['from']} 의 {len(dropped)}줄이 {item['merge']} 에 없다 – "
+                    f"{item['from']} 의 {len(dropped)}줄이 {item['merge']} 에 없다 - "
                     f"첫 줄: {dropped[0][:40]}"
                 )
 
@@ -1365,7 +1365,7 @@ def verify(root: Path) -> VerifyResult:
     for doc, link in found:
         if (doc, link) in baseline:
             continue
-        result.fail(f"{doc} 의 링크가 깨졌다 – {link}")
+        result.fail(f"{doc} 의 링크가 깨졌다 - {link}")
     return result
 
 
@@ -1386,14 +1386,14 @@ def restore_guidance(tag: str | None, backup_name: str | None) -> list[str]:
         ]
     if tag:
         lines += [
-            f"git 으로 되돌리려면 태그 {tag} 를 쓴다 – 옛 경로만 골라 되살리면 이미",
+            f"git 으로 되돌리려면 태그 {tag} 를 쓴다 - 옛 경로만 골라 되살리면 이미",
             "옮겨진 새 경로의 사본이 남아 문서가 둘로 갈린다. 통째로 되돌릴 것:",
             f"  git reset --hard {tag}",
             "  git clean -fd    # 새 경로에 남은 사본을 지운다. 무관한 미추적 파일도",
             "                   # 함께 지워지니 먼저 `git clean -nd` 로 확인할 것",
         ]
     else:
-        lines.append("매핑에 복원 태그가 없다 – `git tag` 로 girok-adopt-before-* 를 확인할 것")
+        lines.append("매핑에 복원 태그가 없다 - `git tag` 로 girok-adopt-before-* 를 확인할 것")
     return lines
 
 
@@ -1430,7 +1430,7 @@ def main(argv: list[str] | None = None) -> int:
             if lost and not args.reset_mapping:
                 listed = ", ".join(lost[:5])
                 print(
-                    f"[중단] 매핑을 다시 쓰지 않았다 – 사람이 손으로 채운 항목이 "
+                    f"[중단] 매핑을 다시 쓰지 않았다 - 사람이 손으로 채운 항목이 "
                     f"{len(lost)}개 있고, `plan` 은 저장소만 보고 매핑을 통째로 다시 "
                     f"만들기 때문에 그 답이 사라진다: {listed}"
                 )
@@ -1443,7 +1443,7 @@ def main(argv: list[str] | None = None) -> int:
         for entry in entries:
             arrow = entry.to or "제자리"
             print(f"[{entry.role:>7}] {entry.frm} → {arrow}  ({entry.why})")
-        print(f"문서 {len(entries)}개 – 판단 필요 {len(unknown)}개")
+        print(f"문서 {len(entries)}개 - 판단 필요 {len(unknown)}개")
         return 0
 
     if args.command == "apply":
@@ -1462,12 +1462,12 @@ def main(argv: list[str] | None = None) -> int:
             if isinstance(exc, (BackupFailed, Blocked)):
                 print(f"[중단] {exc}")
             else:
-                print(f"[중단] 예상치 못한 오류 – {type(exc).__name__}: {exc}")
+                print(f"[중단] 예상치 못한 오류 - {type(exc).__name__}: {exc}")
             tag = getattr(exc, "tag", None)
             backup_name = getattr(exc, "backup_name", None)
             if tag and backup_name:
                 # A backup and restore tag were already made before this
-                # failed – some files may already be staged as moved.
+                # failed - some files may already be staged as moved.
                 print("git mv/git rm 으로 스테이징된 이동이 인덱스에 남아 있을 수 있다.")
                 for line in restore_guidance(tag, backup_name):
                     print(line)
@@ -1481,14 +1481,14 @@ def main(argv: list[str] | None = None) -> int:
             listed = ", ".join(already_tracked)
             print(
                 "[주의] 다음 파일은 이미 git 에 커밋되어 있어 .gitignore 를 추가해도 빠지지\n"
-                "않는다 – 이력을 지우려면 이력을 다시 써야 하는데 이 방법론은 그것을\n"
+                "않는다 - 이력을 지우려면 이력을 다시 써야 하는데 이 방법론은 그것을\n"
                 "금지한다. 비밀이 들어 있다면 값을 폐기·교체하는 것이 답이다: " + listed
             )
 
         excluded = (git_info.get("secrets") or []) + (git_info.get("large") or [])
         if excluded:
             print(
-                "[주의] 다음 파일을 비밀 또는 대용량으로 판단해 .gitignore 에 넣었다 – "
+                "[주의] 다음 파일을 비밀 또는 대용량으로 판단해 .gitignore 에 넣었다 - "
                 "git 밖에 남으므로\n백업 폴더에만 존재한다. 필요한 파일이면 지금 "
                 "확인할 것: " + ", ".join(excluded)
             )
@@ -1502,11 +1502,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if git_info.get("remote") is None:
             print(
-                "원격 저장소가 없다 – `git remote add origin <주소>` 뒤 "
+                "원격 저장소가 없다 - `git remote add origin <주소>` 뒤 "
                 "`git push -u origin <브랜치> --tags` 로 커밋과 복원 태그를 함께 올릴 것"
             )
         else:
-            print("push 할 때는 태그도 함께 올릴 것 – `git push --tags`")
+            print("push 할 때는 태그도 함께 올릴 것 - `git push --tags`")
         return 0
 
     if args.command == "verify":
@@ -1514,7 +1514,7 @@ def main(argv: list[str] | None = None) -> int:
         for failure in result.failures:
             print(f"[실패] {failure}")
         if result.ok:
-            print("이식 검증 통과 – 유실 없음")
+            print("이식 검증 통과 - 유실 없음")
             return 0
         for line in restore_guidance(result.tag, result.backup):
             print(line)
@@ -1527,7 +1527,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     verb = "이미 있음" if result.skipped else "생성"
-    print(f"[백업/{verb}] {result.path.name} – {result.files:,}개 파일 / {result.bytes:,}바이트")
+    print(f"[백업/{verb}] {result.path.name} - {result.files:,}개 파일 / {result.bytes:,}바이트")
     return 0
 
 

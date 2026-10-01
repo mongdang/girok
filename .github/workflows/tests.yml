@@ -38,7 +38,7 @@ jobs:
         # "nothing matched" meant this scan silently never ran.
         #
         # grep exits 0 for a match, 1 for none, and 2 for its own failure.
-        # Anything above 1 fails the job rather than passing quietly – a
+        # Anything above 1 fails the job rather than passing quietly - a
         # check nobody can see failing is worse than no check, because
         # everyone believes it is running.
         run: |
@@ -52,12 +52,12 @@ jobs:
           status=$?
           set -e
           if [ "$status" -gt 1 ]; then
-            echo "::error::스캔 자체가 실패했다 (grep exit $status) – 통과로 처리하지 않는다"
+            echo "::error::스캔 자체가 실패했다 (grep exit $status) - 통과로 처리하지 않는다"
             exit 1
           fi
           if [ -s "$RUNNER_TEMP/hits.txt" ]; then
             cat "$RUNNER_TEMP/hits.txt"
-            echo "::error::공개 저장소에 사내 식별자가 들어왔다 – 일반화 후 다시 커밋할 것"
+            echo "::error::공개 저장소에 사내 식별자가 들어왔다 - 일반화 후 다시 커밋할 것"
             exit 1
           fi
           echo "clean"
@@ -73,7 +73,7 @@ jobs:
           # reason. Everything else that looks like an address is a finding.
           patterns='dev\.azure\.com|visualstudio\.com|\.internal\b|[A-Za-z0-9._%+-]+@(?![A-Za-z0-9.-]*\.invalid\b)(?!example\.com\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
           if ! grep -qP "$patterns" /tmp/canary.txt; then
-            echo "::error::유출 스캔 정규식이 아무것도 못 잡는다 – 초록불이 의미가 없다"
+            echo "::error::유출 스캔 정규식이 아무것도 못 잡는다 - 초록불이 의미가 없다"
             exit 1
           fi
           echo "canary caught"

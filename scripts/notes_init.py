@@ -5,7 +5,7 @@ agents that cannot load skills, the two committed settings files, and the
 `.method/` snapshot.
 
 Nothing that already exists is overwritten. Initialization runs again on
-repositories that are already half set up – a `/notes` on a repo missing one
+repositories that are already half set up - a `/notes` on a repo missing one
 file should add that file, not flatten the work in the others.
 """
 import argparse
@@ -24,7 +24,7 @@ def read_git_email(root: Path) -> str | None:
     """The git identity in this repository, used to fill in `workers`.
 
     Without it, initialization would create `docs_<id>/` and the very next
-    write would be blocked for an unconfirmed worker – `/notes` would set the
+    write would be blocked for an unconfirmed worker - `/notes` would set the
     repository up and then refuse to write to it.
     """
     try:
@@ -90,7 +90,7 @@ def init(
 ) -> InitResult:
     # Resolved so a relative --root (".") compares equal to the absolute
     # paths the config loader returns. Without this, a repository that
-    # already had a config crashed on `notes_dir.relative_to(root)` – every
+    # already had a config crashed on `notes_dir.relative_to(root)` - every
     # test passed because tests always hand in absolute tmp paths.
     root = Path(root).resolve()
     repo_name = repo_name or root.name
@@ -98,7 +98,7 @@ def init(
 
     # A repository that already has a config has already decided where its
     # documents live. Ignoring that would scatter a second, empty skeleton
-    # beside the real one – which is exactly the copy drift this exists to
+    # beside the real one - which is exactly the copy drift this exists to
     # remove.
     existing = notes_config._config_path(root)
     if existing is not None:
@@ -122,7 +122,7 @@ def init(
 
     # The skeleton documents describe the layout they were written into, so
     # the paths and the ADR id rule come from the config rather than being
-    # spelled as the default layout – a flat repository got an index claiming
+    # spelled as the default layout - a flat repository got an index claiming
     # its board was docs/PROGRESS.md and its ids were date-style.
     board_rel = (
         board_name
@@ -131,7 +131,7 @@ def init(
     )
     # The pointer documents name paths a person will follow. Spelling the
     # default layout there sent a flat repository's CLAUDE.md pointing at a
-    # docs/PROGRESS.md it does not have – the one file whose whole job is to
+    # docs/PROGRESS.md it does not have - the one file whose whole job is to
     # say where things are.
     notes_prefix = "" if notes_dir == "." else f"{notes_dir}/"
     fields = {
@@ -150,7 +150,7 @@ def init(
         "decisionsIndex": f"{decisions_rel}/README.md",
         "archiveRef": f" · 아카이브 `{doc_root}/archive/`" if wants_archive else "",
         "adrIdRule": (
-            "`NNN-slug.md`. 인용은 `decisions/NNN` 또는 `ADR-NNN` – 숫자만 적은 것은 인용이 아니다"
+            "`NNN-slug.md`. 인용은 `decisions/NNN` 또는 `ADR-NNN` - 숫자만 적은 것은 인용이 아니다"
             if adr_style == "numbered"
             else "`ADR-YYMMDD-<작업자id>-slug.md`. 인용은 확장자 뺀 파일명 전체"
         ),
@@ -208,7 +208,7 @@ def init(
     if notes.resolve() != root.resolve():
         _write(
             notes / ".gitignore",
-            "# 이 폴더는 문서 전용이다 – 코드·바이너리가 섞이는 사고를 여기서 막는다\n"
+            "# 이 폴더는 문서 전용이다 - 코드·바이너리가 섞이는 사고를 여기서 막는다\n"
             "*.exe\n*.dll\n*.pdb\n*.zip\nbin/\nobj/\n",
             result, root,
         )
@@ -280,7 +280,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # A repository can be read-only by agreement rather than by permission –
+    # A repository can be read-only by agreement rather than by permission -
     # a reference checkout, or one someone has been told not to touch.
     # Nothing inside it says so, so the caller has to name what it is about
     # to write to. This exists because a repository under exactly that
@@ -292,11 +292,11 @@ def main(argv: list[str] | None = None) -> int:
     # and initializing a directory that merely contains repositories would
     # scatter a skeleton across somebody's workspace.
     if not notes_config.load(root).is_repository:
-        print(f"[중단] `{root}` 는 저장소가 아니다 – `.git` 이 없다.")
+        print(f"[중단] `{root}` 는 저장소가 아니다 - `.git` 이 없다.")
         print("  둘 중 하나다:")
-        print("  ① 한 단계 위에서 켰다 – Claude Code 는 켠 폴더를 대상으로 삼는다.")
+        print("  ① 한 단계 위에서 켰다 - Claude Code 는 켠 폴더를 대상으로 삼는다.")
         print("     작업할 저장소 폴더로 이동해 다시 실행할 것.")
-        print("  ② 이 프로젝트가 아직 git 을 쓰지 않는다 – `git init` 을 먼저 할 것.")
+        print("  ② 이 프로젝트가 아직 git 을 쓰지 않는다 - `git init` 을 먼저 할 것.")
         print("     이 방법론은 판본 추적·병합·커밋 즉시 push 를 git 에 의존한다.")
         return 1
 
@@ -322,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     for rel in result.updated:
         print(f"[갱신] {rel}")
     for rel in result.skipped:
-        print(f"[유지] {rel} – 이미 있어서 건드리지 않음")
+        print(f"[유지] {rel} - 이미 있어서 건드리지 않음")
     for notice in result.notices:
         print(f"[확인] {notice}")
     for problem in result.problems:

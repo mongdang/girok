@@ -17,7 +17,7 @@ class PayloadError(Exception):
 
     Raised rather than swallowed. The old behaviour returned an empty dict,
     the caller resolved cwd to ".", and the hook then reported confidently
-    on a different repository – "the snapshot is missing" for a repository
+    on a different repository - "the snapshot is missing" for a repository
     whose snapshot was right there. Nothing in that output said it was wrong.
     """
 
@@ -36,8 +36,8 @@ def _prepare_streams() -> None:
 def _read_raw() -> str:
     """The payload, decoded as UTF-8 regardless of the machine's locale.
 
-    Reading through `sys.stdin` would decode with the locale encoding –
-    cp949 on a Korean Windows install – so a payload carrying Korean (a
+    Reading through `sys.stdin` would decode with the locale encoding -
+    cp949 on a Korean Windows install - so a payload carrying Korean (a
     prompt, a path) would arrive mangled or raise. Claude Code sends UTF-8,
     so the bytes are decoded here rather than left to the locale.
 
@@ -66,8 +66,8 @@ def read_payload() -> dict:
 
 # Payload field names live here and nowhere else.
 #
-# Three of them were wrong at the same time – `user_input` for the prompt,
-# `tool_result` for the output – and every test agreed with the code because
+# Three of them were wrong at the same time - `user_input` for the prompt,
+# `tool_result` for the output - and every test agreed with the code because
 # the tests fed the same invented names. The safety-gate injection never
 # fired and a failed push read as done, both with a green suite.
 #
@@ -118,7 +118,7 @@ def output_text_of(payload: dict) -> str:
 def failed(payload: dict) -> bool:
     """Whether the tool call reported a failure.
 
-    An absent response is not a failure – silence is not evidence.
+    An absent response is not a failure - silence is not evidence.
     """
     response = _response(payload)
     if response is None:
@@ -138,7 +138,7 @@ def cwd_of(payload: dict) -> Path:
     """
     cwd = payload.get("cwd")
     if not cwd:
-        raise PayloadError("hook payload 에 cwd 가 없다 – 어느 저장소인지 알 수 없다")
+        raise PayloadError("hook payload 에 cwd 가 없다 - 어느 저장소인지 알 수 없다")
     return Path(cwd)
 
 

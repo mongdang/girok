@@ -2,7 +2,7 @@
 
 The whole point of adoption is that files move. The backup is what makes
 that reversible, so it runs before `git init`, before the skeleton, before
-anything – otherwise it captures a repository girok has already edited and
+anything - otherwise it captures a repository girok has already edited and
 calling it "the original" is a lie.
 """
 from pathlib import Path

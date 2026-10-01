@@ -39,7 +39,7 @@ def main() -> int:
 
     hook_io.emit_context(
         "UserPromptSubmit",
-        f"[girok] 실장비 모션이 언급됐다. SAFETY_GATE.md OPEN {open_items}건 – "
+        f"[girok] 실장비 모션이 언급됐다. SAFETY_GATE.md OPEN {open_items}건 - "
         f"OPEN 이 남아 있는 동안 모션 명령을 실행하거나 실행을 안내하지 않는다. "
         f"항목은 사람 확인자만 닫는다.",
     )

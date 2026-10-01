@@ -1,4 +1,4 @@
-# ADR-{id} – {title}
+# ADR-{id} - {title}
 
 | | |
 |---|---|
