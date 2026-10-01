@@ -2,7 +2,7 @@
 
 The snapshot is the layer that makes a plugin-delivered methodology
 self-contained. It holds the full rule text and the linters, it is
-committed, and it is never edited by hand — editing it would recreate the
+committed, and it is never edited by hand – editing it would recreate the
 copy drift the plugin exists to remove.
 
 Three operations:
@@ -97,17 +97,17 @@ SKILL_ORDER = (
 
 GATE_BLOCK = """\
 > [!CAUTION]
-> ## 작업 전 필수 확인 — 통과 못 하면 어떤 편집도 하지 않는다
+> ## 작업 전 필수 확인 – 통과 못 하면 어떤 편집도 하지 않는다
 >
 > 1. 이 파일(`.method/RULES.md`)과 `.method/VERSION` 이 저장소에 있는가?
 >    없으면 **작업을 중단**하고 사용자에게 알린다.
 > 2. Claude Code 라면 세션 시작 주입 블록 `[girok] ready vX.Y.Z` 가 이 세션에
->    있는가? 없으면 검사가 돌고 있지 않은 것이다 — **작업을 중단**하고 알린다.
+>    있는가? 없으면 검사가 돌고 있지 않은 것이다 – **작업을 중단**하고 알린다.
 >    셋 중 하나다: 폴더 신뢰 미승인, 이 머신에 Python 없음, 스냅샷이 낡아 훅이
 >    등록되지 않음(`/notes` 로 sync).
 > 3. 다른 에이전트라면 이 파일을 **끝까지 읽은 뒤에만** 작업한다. 아래가 규칙 전문이다.
 >
-> 이 확인을 건너뛰고 편집하면 규칙이 적용되지 않은 채로 기록이 쌓인다 — 그 사실을
+> 이 확인을 건너뛰고 편집하면 규칙이 적용되지 않은 채로 기록이 쌓인다 – 그 사실을
 > 나중에 알아낼 방법이 없다. 훅은 이 저장소가 `.claude/settings.json` 에서 등록하므로
 > 플러그인 없이도 돈다.
 """
@@ -148,7 +148,7 @@ class NotOursError(Exception):
 
     sync rebuilds that folder by deleting it first. A repository that happens
     to keep something else at the same path would lose it, so the folder must
-    identify itself — a VERSION file naming this plugin — before anything is
+    identify itself – a VERSION file naming this plugin – before anything is
     removed.
     """
 
@@ -238,7 +238,7 @@ def build_rules(plugin_root: Path = PLUGIN_ROOT) -> str:
         "# 문서 방법론 규칙 전문",
         "",
         "> 이 파일은 `girok` 플러그인이 생성한 **동결 사본**이다.",
-        "> 사람이 손으로 고치지 않는다 — 개정은 플러그인 원본에서 하고 sync 로 내려받는다.",
+        "> 사람이 손으로 고치지 않는다 – 개정은 플러그인 원본에서 하고 sync 로 내려받는다.",
         "> 판본은 같은 폴더의 `VERSION` 참고.",
         "",
         GATE_BLOCK,
@@ -332,7 +332,7 @@ def sync_settings(root: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> b
             # so this stops -- but loudly. The caller records the problem.
             raise SettingsUnreadable(
                 f".claude/settings.json 을 읽을 수 없어 훅을 등록하지 못했다 ({exc}). "
-                f"그 파일을 고친 뒤 다시 sync 할 것 — 지금은 규칙이 저장소에 있어도 "
+                f"그 파일을 고친 뒤 다시 sync 할 것 – 지금은 규칙이 저장소에 있어도 "
                 f"아무것도 검사하지 않는다"
             ) from exc
     else:
@@ -390,7 +390,7 @@ def sync_gate(pointer: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> bo
     if replaced is None:
         raise GateUnrecognized(
             f"{pointer} 에서 girok 게이트 블록을 찾지 못해 문언을 갱신하지 못했다. "
-            f"손으로 고쳐 쓴 것이라면 그대로 두는 것이 맞다 — 현재 문언은 "
+            f"손으로 고쳐 쓴 것이라면 그대로 두는 것이 맞다 – 현재 문언은 "
             f".method/RULES.md 머리에 있다"
         )
     if replaced == text:
@@ -483,7 +483,7 @@ def _registration_problems(cfg: notes_config.NotesConfig) -> list[str]:
     path = cfg.repo_root / ".claude" / "settings.json"
     if not path.is_file():
         return [
-            ".claude/settings.json 없음 — 훅이 등록되지 않았다. "
+            ".claude/settings.json 없음 – 훅이 등록되지 않았다. "
             "규칙이 저장소에 있어도 아무것도 검사하지 않는다. `/notes` 로 sync 할 것"
         ]
     try:
@@ -504,7 +504,7 @@ def _registration_problems(cfg: notes_config.NotesConfig) -> list[str]:
             missing.append(event)
     if missing:
         return [
-            f".claude/settings.json 에 훅이 등록되지 않았다 ({', '.join(missing)}) — "
+            f".claude/settings.json 에 훅이 등록되지 않았다 ({', '.join(missing)}) – "
             f"등록이 없으면 규칙이 저장소에 있어도 아무것도 검사하지 않는다. "
             f"`/notes` 로 sync 할 것"
         ]
@@ -602,7 +602,7 @@ def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult
     # and the PLUGIN_ROOT fallback can point at that very folder.
     if not (plugin_root / ".claude-plugin" / "plugin.json").is_file():
         raise NoPluginError(
-            f"{plugin_root} 는 girok 플러그인이 아니다 — sync 는 플러그인 원본에서만 돈다. "
+            f"{plugin_root} 는 girok 플러그인이 아니다 – sync 는 플러그인 원본에서만 돈다. "
             f"플러그인이 설치된 머신에서 `/notes` 로 실행할 것. "
             f"스냅샷은 손대지 않았다"
         )
@@ -631,7 +631,7 @@ def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult
         if not _looks_like_ours(stamp):
             raise NotOursError(
                 f"{target} 가 이미 있는데 이 플러그인이 만든 것이 아니다 "
-                f"(VERSION 파일이 없거나 다른 내용이다). 지우지 않고 멈춘다 — "
+                f"(VERSION 파일이 없거나 다른 내용이다). 지우지 않고 멈춘다 – "
                 f"그 폴더가 무엇인지 확인한 뒤 옮기거나 지우고 다시 실행할 것"
             )
         for path in sorted(target.rglob("*")):
@@ -705,29 +705,29 @@ def verify(start: Path | str = ".") -> VerifyResult:
 
     Local hooks only protect people who have the plugin installed. Anyone
     without it, another agent, or an edit made through a web UI reaches the
-    repository unchecked — so this runs on every push.
+    repository unchecked – so this runs on every push.
     """
     cfg = notes_config.load(start)
     target = method_dir(cfg)
     result = VerifyResult()
 
     if not target.is_dir():
-        result.problems.append(f"{target} 없음 — `/notes` 로 초기화할 것")
+        result.problems.append(f"{target} 없음 – `/notes` 로 초기화할 것")
         return result
 
     version_file = target / "VERSION"
     if not version_file.is_file():
-        result.problems.append(f"{version_file} 없음 — 스냅샷이 손상됨")
+        result.problems.append(f"{version_file} 없음 – 스냅샷이 손상됨")
         return result
 
     recorded = parse_version(version_file.read_text(encoding="utf-8"))
     actual = _content_hash(target)
     if actual != recorded.content_hash:
         changed = _changed_files(target, recorded)
-        detail = f" — {', '.join(changed)}" if changed else ""
+        detail = f" – {', '.join(changed)}" if changed else ""
         result.problems.append(
             f".method/ 내용이 VERSION 의 해시와 다름{detail}. "
-            f"사람이 손댔거나 sync 가 낡음 — 개정은 플러그인 원본에서 하고 다시 sync 할 것"
+            f"사람이 손댔거나 sync 가 낡음 – 개정은 플러그인 원본에서 하고 다시 sync 할 것"
         )
     result.problems.extend(_registration_problems(cfg))
     return result
@@ -739,7 +739,7 @@ def _changed_files(target: Path, recorded: Version) -> list[str]:
 
     Only possible where the plugin source is present. CI runs `verify` out of
     the snapshot on a checkout with no plugin installed, and comparing against
-    a build with no skills to read named RULES.md as the culprit every time —
+    a build with no skills to read named RULES.md as the culprit every time –
     a confident wrong answer in place of no answer.
     """
     if not (PLUGIN_ROOT / "skills").is_dir():
@@ -809,13 +809,13 @@ def main(argv: list[str] | None = None) -> int:
         for rel in result.removed:
             print(f"[제거] 스냅샷에 없어야 할 파일: {rel}")
         if result.gate_refreshed:
-            print("[갱신] CLAUDE.md 게이트 문언 — 커밋해야 다른 머신에도 걸린다")
+            print("[갱신] CLAUDE.md 게이트 문언 – 커밋해야 다른 머신에도 걸린다")
         if result.gate_problem:
             print(f"[확인] {result.gate_problem}")
         if result.settings_problem:
             print(f"[실패] {result.settings_problem}")
         elif result.settings_changed:
-            print("[등록] .claude/settings.json 에 훅 5종 — 커밋해야 다른 머신에도 걸린다")
+            print("[등록] .claude/settings.json 에 훅 5종 – 커밋해야 다른 머신에도 걸린다")
         print(f"[완료] {len(result.written)}개 파일, {result.version.render().strip()}")
         return 0
 
@@ -830,20 +830,20 @@ def main(argv: list[str] | None = None) -> int:
 
     state = status(args.root)
     if state.snapshot_version is None:
-        print("[경고] .method/ 스냅샷 없음 — `/notes` 로 초기화할 것")
+        print("[경고] .method/ 스냅샷 없음 – `/notes` 로 초기화할 것")
         return 1
     # Having nothing to compare against is not the same as disagreeing. On a
     # machine without the plugin the snapshot is the only authority there is.
     if state.plugin_version is None:
-        print(f"스냅샷 v{state.snapshot_version} — 플러그인이 없어 대조는 건너뛴다")
+        print(f"스냅샷 v{state.snapshot_version} – 플러그인이 없어 대조는 건너뛴다")
         return 0
     if not state.in_sync:
         print(
-            f"[경고] 스냅샷 v{state.snapshot_version} vs 플러그인 v{state.plugin_version} — "
+            f"[경고] 스냅샷 v{state.snapshot_version} vs 플러그인 v{state.plugin_version} – "
             f"`/notes` 로 sync 할 것"
         )
         return 1
-    print(f"스냅샷 v{state.snapshot_version} — 플러그인과 일치")
+    print(f"스냅샷 v{state.snapshot_version} – 플러그인과 일치")
     return 0
 
 

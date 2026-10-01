@@ -6,7 +6,7 @@ keeps `STATE.md` and `decisions/NNN-slug.md` at the repository root and
 cites decisions by bare number.
 
 Renaming 52 decision files to fit the plugin would cost more than it
-returns — citations spread past the documents — so the layout is
+returns – citations spread past the documents – so the layout is
 configuration, not an assumption. A methodology that only supports the
 repository it was extracted from is a copy with extra steps.
 """
@@ -68,7 +68,7 @@ def flat_repo(tmp_path):
 | [001](001-first.md) | accepted | 첫 결정 |
 """,
     )
-    write(root / "decisions" / "001-first.md", "# 001 — 첫 결정\n\n내용\n")
+    write(root / "decisions" / "001-first.md", "# 001 – 첫 결정\n\n내용\n")
     return root
 
 
@@ -118,7 +118,7 @@ def test_a_broken_anchor_in_a_root_document_is_still_caught(flat_repo):
 
 
 def test_numbered_decisions_are_recognized(flat_repo):
-    write(flat_repo / "decisions" / "002-second.md", "# 002 — 두번째\n\n내용\n")
+    write(flat_repo / "decisions" / "002-second.md", "# 002 – 두번째\n\n내용\n")
 
     result = check_docs.run(flat_repo)
 
@@ -127,7 +127,7 @@ def test_numbered_decisions_are_recognized(flat_repo):
 
 
 def test_a_numbered_decision_listed_in_the_index_passes(flat_repo):
-    write(flat_repo / "decisions" / "002-second.md", "# 002 — 두번째\n\n내용\n")
+    write(flat_repo / "decisions" / "002-second.md", "# 002 – 두번째\n\n내용\n")
     write(
         flat_repo / "decisions" / "README.md",
         """

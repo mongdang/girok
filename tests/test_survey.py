@@ -2,7 +2,7 @@
 
 Initialization used to create the default skeleton and leave whatever was
 already there sitting beside it. Choosing the right layout for the second
-repository to adopt this was done by a person reading the repository — the
+repository to adopt this was done by a person reading the repository – the
 plugin could not do it, so `/notes` on a project with its own conventions
 would have produced a second, empty set of documents.
 
@@ -45,7 +45,7 @@ def notes_in_subfolder(tmp_path):
             "Solution-notes/docs/PROGRESS.md": f"# 현황판\n\n## 일자별 작업 로그\n\n{LONG}",
             "Solution-notes/docs/SAFETY_GATE.md": "# 안전 게이트\n\n| # | 상태 |\n|---|---|\n| 1 | OPEN |\n",
             "Solution-notes/docs/decisions/README.md": "# 결정 인덱스\n\n| ID |\n|---|\n",
-            "Solution-notes/docs/decisions/ADR-001-first.md": "# ADR-001 — 첫\n",
+            "Solution-notes/docs/decisions/ADR-001-first.md": "# ADR-001 – 첫\n",
             "Solution-notes/docs/archive/old.md": "# 옛 서사\n",
             "Solution-notes/docs_kdh/PROGRESS.md": "# 현황판 (kdh)\n",
         },
@@ -63,8 +63,8 @@ def notes_at_root(tmp_path):
             "agent/run.py": "print('x')\n",
             "docs/protocol.md": f"# 프로토콜\n\n{LONG}",
             "decisions/README.md": "# 결정 인덱스\n\n| ID |\n|---|\n",
-            "decisions/001-first.md": "# 001 — 첫\n",
-            "decisions/052-latest.md": "# 052 — 최신\n",
+            "decisions/001-first.md": "# 001 – 첫\n",
+            "decisions/052-latest.md": "# 052 – 최신\n",
         },
     )
 
@@ -157,7 +157,7 @@ def test_a_repository_that_forbids_an_archive_is_respected(notes_at_root):
     was deleted is in git history. Proposing one would have this plugin
     breaking the convention of the repository it was invited into."""
     (notes_at_root / "CLAUDE.md").write_text(
-        "# 지침\n\n- **아카이브 폴더를 만들지 않는다** — 지운 건 git 히스토리에 있다\n",
+        "# 지침\n\n- **아카이브 폴더를 만들지 않는다** – 지운 건 git 히스토리에 있다\n",
         encoding="utf-8",
     )
 
@@ -172,7 +172,7 @@ def test_a_repository_that_forbids_an_archive_is_respected(notes_at_root):
 def test_it_reports_a_decisions_folder_with_no_index(tmp_path):
     repo = make(
         tmp_path / "x",
-        {"docs/NOTE.md": "# 메모\n", "docs/decisions/ADR-001-a.md": "# ADR-001 — a\n"},
+        {"docs/NOTE.md": "# 메모\n", "docs/decisions/ADR-001-a.md": "# ADR-001 – a\n"},
     )
 
     survey = notes_survey.run(repo)
@@ -195,7 +195,7 @@ def test_it_reports_decision_files_outside_the_decisions_folder(tmp_path):
         {
             "docs/NOTE.md": "# 메모\n",
             "docs/decisions/README.md": "# 인덱스\n",
-            "docs/ADR-007-stray.md": "# ADR-007 — 떠돌이\n",
+            "docs/ADR-007-stray.md": "# ADR-007 – 떠돌이\n",
         },
     )
 
@@ -251,13 +251,13 @@ def test_an_already_configured_repository_is_compared_not_reproposed(notes_in_su
 # --- three false positives found by running it on real repositories ---------
 
 def test_a_parallel_worker_decision_is_not_a_stray(notes_in_subfolder):
-    """During parallel work a decision belongs in `docs_<id>/decisions/` —
+    """During parallel work a decision belongs in `docs_<id>/decisions/` –
     the rules say so. Reporting those as strays flagged eight correctly
     placed files in the first repository it was pointed at."""
     folder = notes_in_subfolder / "Solution-notes" / "docs_kdh" / "decisions"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "README.md").write_text("# 인덱스\n", encoding="utf-8")
-    (folder / "ADR-260821-kdh-parallel.md").write_text("# ADR — 병행\n", encoding="utf-8")
+    (folder / "ADR-260821-kdh-parallel.md").write_text("# ADR – 병행\n", encoding="utf-8")
 
     survey = notes_survey.run(notes_in_subfolder)
 
@@ -272,7 +272,7 @@ def test_a_decision_file_is_not_a_board_candidate(tmp_path):
         {
             "STATE.md": f"# 지금 상태\n\n## 한 줄\n\n{LONG}",
             "decisions/README.md": "# 인덱스\n",
-            "decisions/041-screen-shows-state.md": f"# 041 — 화면\n\n{LONG}",
+            "decisions/041-screen-shows-state.md": f"# 041 – 화면\n\n{LONG}",
         },
     )
 
@@ -339,7 +339,7 @@ def test_a_module_that_still_matches_is_not_reported(notes_at_root):
 
 def test_the_survey_travels_with_the_snapshot(tmp_path):
     """An adopted repository should be able to ask "has my structure drifted?"
-    without the plugin installed — same reason the linters ship in there."""
+    without the plugin installed – same reason the linters ship in there."""
     import method_sync
 
     assert "notes_survey.py" in method_sync.SNAPSHOT_SCRIPTS

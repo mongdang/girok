@@ -1,6 +1,6 @@
 """Keeping references pointing at documents that moved.
 
-Files surviving is what the backup guarantees. Links surviving is not — a
+Files surviving is what the backup guarantees. Links surviving is not – a
 document can be intact at its new path while every reference to it is dead,
 and no hash check notices that.
 """
@@ -205,7 +205,7 @@ def test_a_link_after_an_unclosed_fence_is_left_alone(tmp_path):
 
 
 def test_a_link_inside_a_document_that_moved_follows_too(tmp_path):
-    # The referring document is itself in the move list — its links were
+    # The referring document is itself in the move list – its links were
     # written relative to where it used to be, so resolving them from the
     # new parent looks up a path no mapping knows.
     root = tmp_path / "r"
@@ -236,7 +236,7 @@ def test_a_moved_document_relinks_to_a_file_that_stayed(tmp_path):
 
 
 def test_a_link_that_was_already_broken_is_not_invented(tmp_path):
-    # Nothing at the old path either — this link was dead before adoption
+    # Nothing at the old path either – this link was dead before adoption
     # and guessing a new destination for it would be a fabrication.
     root = tmp_path / "r"
     write(root / "docs" / "설계.md", "[없다](없는문서.md)\n")

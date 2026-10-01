@@ -136,7 +136,7 @@ def test_allows_a_motion_command_once_every_item_is_closed(repo):
 
 
 def test_a_sub_numbered_open_item_still_blocks_motion(repo):
-    """`3a` is a gate item. The linter knew that and this guard did not — the
+    """`3a` is a gate item. The linter knew that and this guard did not – the
     row pattern had been copied instead of shared, and the copy drifted. An
     OPEN item that counts as zero open items is the worst possible direction
     for this particular check to be wrong in."""
@@ -367,9 +367,9 @@ def test_an_unmapped_worker_cannot_push(repo):
 
 
 def test_a_folder_that_never_adopted_this_is_not_blocked(tmp_path):
-    """parallelMode defaults to true, so a repository with no config at all —
+    """parallelMode defaults to true, so a repository with no config at all –
     one that never adopted the methodology, or a session started outside a
-    repository — was blocked from committing for an "unconfirmed worker"
+    repository – was blocked from committing for an "unconfirmed worker"
     nobody was ever asked to configure."""
     plain = tmp_path / "unrelated"
     (plain / ".git").mkdir(parents=True)

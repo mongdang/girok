@@ -1,8 +1,8 @@
 """The force-push guard, and the one way past it.
 
 The guard was written to catch `--force`, `--force-with-lease` and `-f`. It
-missed the refspec form — `git push origin +master` is the same operation
-with no flag — and that is how it was bypassed on the day it mattered. A
+missed the refspec form – `git push origin +master` is the same operation
+with no flag – and that is how it was bypassed on the day it mattered. A
 guard with a hole that only its author knows about is worse than no guard,
 because everyone else trusts it.
 
@@ -85,7 +85,7 @@ def test_the_refspec_form_was_the_hole(repo):
 # --- the way past -----------------------------------------------------------
 
 def test_a_reason_lets_it_through(repo, monkeypatch):
-    monkeypatch.setenv("GIROK_FORCE_PUSH_REASON", "이력 리셋 — 새 이름으로 새 출발, 사용자 지시")
+    monkeypatch.setenv("GIROK_FORCE_PUSH_REASON", "이력 리셋 – 새 이름으로 새 출발, 사용자 지시")
 
     decision = decide(repo, "git push --force origin master")
 
@@ -93,7 +93,7 @@ def test_a_reason_lets_it_through(repo, monkeypatch):
 
 
 def test_the_reason_is_echoed_so_it_lands_in_the_transcript(repo, monkeypatch):
-    monkeypatch.setenv("GIROK_FORCE_PUSH_REASON", "이력 리셋 — 사용자 지시")
+    monkeypatch.setenv("GIROK_FORCE_PUSH_REASON", "이력 리셋 – 사용자 지시")
 
     decision = decide(repo, "git push --force origin master")
 
@@ -116,7 +116,7 @@ def test_a_one_word_reason_is_not_enough(repo, monkeypatch):
 
 def test_the_override_does_not_unlock_anything_else(repo, monkeypatch):
     """It is about history, not about the safety rules."""
-    monkeypatch.setenv("GIROK_FORCE_PUSH_REASON", "이력 리셋 — 사용자 지시")
+    monkeypatch.setenv("GIROK_FORCE_PUSH_REASON", "이력 리셋 – 사용자 지시")
     write(
         repo / "notes" / "docs" / "SAFETY_GATE.md",
         "# 게이트\n\n| # | 항목 | 상태 |\n|---|---|---|\n| 1 | 정위치 | OPEN |\n",

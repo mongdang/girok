@@ -48,7 +48,7 @@ def test_reports_a_toc_anchor_that_no_heading_matches(notes_repo):
 
 
 def test_a_header_with_a_spaced_separator_breaks_its_own_anchor(notes_repo):
-    """` — ` in a header makes the linter's slug and GitHub's real anchor
+    """` – ` in a header makes the linter's slug and GitHub's real anchor
     disagree on hyphen count, so the TOC link silently stops working."""
     write(
         notes_repo / "notes" / "docs" / "PROGRESS.md",
@@ -59,11 +59,11 @@ def test_a_header_with_a_spaced_separator_breaks_its_own_anchor(notes_repo):
 
 ## 목차
 
-- [상태 요약 — 개요](#상태-요약-개요)
+- [상태 요약 – 개요](#상태-요약-개요)
 
 ---
 
-## 상태 요약 — 개요
+## 상태 요약 – 개요
 
 내용
 """,
@@ -202,7 +202,7 @@ def test_reports_a_citation_of_an_adr_that_does_not_exist(notes_repo):
 def test_accepts_a_date_style_adr_id(notes_repo):
     write(
         notes_repo / "notes" / "docs" / "decisions" / "ADR-260821-abc-parallel.md",
-        "# ADR-260821-abc-parallel — 병행\n",
+        "# ADR-260821-abc-parallel – 병행\n",
     )
     write(
         notes_repo / "notes" / "docs" / "decisions" / "README.md",
@@ -226,7 +226,7 @@ def test_accepts_a_date_style_adr_id(notes_repo):
 def test_reports_an_adr_missing_from_its_index(notes_repo):
     write(
         notes_repo / "notes" / "docs" / "decisions" / "ADR-002-second.md",
-        "# ADR-002 — 두번째\n",
+        "# ADR-002 – 두번째\n",
     )
 
     result = run(notes_repo)
@@ -408,8 +408,8 @@ def test_archive_is_not_linted(notes_repo, name):
 
 def test_reports_a_local_absolute_path_in_a_document(notes_repo):
     """The edit-time hook warns about these, but a path that arrives any
-    other way — someone without the plugin, a web edit, a file written before
-    adoption — was never caught. The linter is the backstop."""
+    other way – someone without the plugin, a web edit, a file written before
+    adoption – was never caught. The linter is the backstop."""
     write(
         notes_repo / "notes" / "docs" / "PROGRESS.md",
         r"""
@@ -489,7 +489,7 @@ def test_an_equipment_registry_path_is_not_a_file_path(notes_repo):
 
 
 def test_says_so_when_a_foreign_citation_detaches_its_particle(notes_repo):
-    """`other-repo` 의 ADR-020 — with a space before the particle — is the same
+    """`other-repo` 의 ADR-020 – with a space before the particle – is the same
     citation written with a Korean spacing mistake: a particle attaches to the
     word before it. The linter has to name that, because reporting it as a dead
     reference sent one reader looking for a bug in the linter and another

@@ -146,7 +146,7 @@ def test_reports_nothing_when_the_module_is_off(notes_repo):
 
 def test_a_missing_gate_document_is_a_failure_not_silence(notes_repo):
     """Turning the module on without the gate document means every marker is
-    unregistered by definition — say so instead of passing."""
+    unregistered by definition – say so instead of passing."""
     write(notes_repo / "src" / "a.cs", "// SAFETY-STUB\n")
 
     result = marker_scan.run(notes_repo)

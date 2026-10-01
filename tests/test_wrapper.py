@@ -4,7 +4,7 @@ Two things it must get right, and both were wrong at first:
 
 - pick an interpreter that actually runs. On Windows `python3` normally
   resolves to the Microsoft Store app execution alias, which prints
-  "Python" and exits 49 — resolving a name is not the same as finding an
+  "Python" and exits 49 – resolving a name is not the same as finding an
   interpreter, and picking that one leaves the hooks silently dead on a
   machine that has Python installed.
 - when there is no usable Python, say so. Exiting quietly would leave a
@@ -115,7 +115,7 @@ def test_the_wrapper_has_no_carriage_returns():
 def test_the_wrapper_is_committed_executable():
     """The same failure as in the snapshot, one layer up. A plugin installed
     on Linux gets this file out of git, and git is where the execute bit
-    lives — without it bash refuses to run the wrapper and every hook is
+    lives – without it bash refuses to run the wrapper and every hook is
     silently dead on that machine."""
     listed = subprocess.run(
         ["git", "ls-files", "-s", "hooks/run-hook.cmd"],

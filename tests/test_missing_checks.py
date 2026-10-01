@@ -1,6 +1,6 @@
 """Rules that were written down but never checked.
 
-Each of these is in the rule text — some since the beginning — and the
+Each of these is in the rule text – some since the beginning – and the
 linter said nothing about them. A rule nobody checks is a rule that drifts,
 which is the failure this whole project is about; finding five of them in
 its own linter is the same mistake one level up.
@@ -50,7 +50,7 @@ def test_an_adr_needs_no_toc(notes_repo):
     """A decision card is short by design; the rule excepts it."""
     write(
         notes_repo / "notes" / "docs" / "decisions" / "ADR-002-second.md",
-        "# ADR-002 — 두번째\n\n## 결정\n\n내용\n",
+        "# ADR-002 – 두번째\n\n## 결정\n\n내용\n",
     )
     write(
         notes_repo / "notes" / "docs" / "decisions" / "README.md",
@@ -149,7 +149,7 @@ def test_the_check_is_skipped_when_the_module_is_off(notes_repo, gated):
 def test_a_supersede_pointing_nowhere_is_reported(notes_repo):
     write(
         notes_repo / "notes" / "docs" / "decisions" / "ADR-001-first.md",
-        "# ADR-001 — 첫 결정\n\n| | |\n|---|---|\n| 상태 | superseded-by-ADR-099 |\n\n## 결정\n\n내용\n",
+        "# ADR-001 – 첫 결정\n\n| | |\n|---|---|\n| 상태 | superseded-by-ADR-099 |\n\n## 결정\n\n내용\n",
     )
 
     result = run(notes_repo)
@@ -161,11 +161,11 @@ def test_a_supersede_pointing_nowhere_is_reported(notes_repo):
 def test_a_supersede_pointing_at_a_real_decision_passes(notes_repo):
     write(
         notes_repo / "notes" / "docs" / "decisions" / "ADR-001-first.md",
-        "# ADR-001 — 첫 결정\n\n| | |\n|---|---|\n| 상태 | superseded-by-ADR-002 |\n\n## 결정\n\n내용\n",
+        "# ADR-001 – 첫 결정\n\n| | |\n|---|---|\n| 상태 | superseded-by-ADR-002 |\n\n## 결정\n\n내용\n",
     )
     write(
         notes_repo / "notes" / "docs" / "decisions" / "ADR-002-second.md",
-        "# ADR-002 — 두번째\n\n## 결정\n\n내용\n",
+        "# ADR-002 – 두번째\n\n## 결정\n\n내용\n",
     )
     write(
         notes_repo / "notes" / "docs" / "decisions" / "README.md",
@@ -182,7 +182,7 @@ def test_a_supersede_pointing_at_a_real_decision_passes(notes_repo):
 # Found twice in real documents, both times inside a table cell holding a
 # Windows path: the `\r` of `scripts\run-x.ps1` was written as an actual
 # carriage return. It splits the line, breaks the table, and is invisible in
-# every editor — the only way anyone finds it is a checker that looks.
+# every editor – the only way anyone finds it is a checker that looks.
 
 def test_a_lone_carriage_return_is_reported(notes_repo):
     board = notes_repo / "notes" / "docs" / "PROGRESS.md"

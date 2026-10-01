@@ -33,7 +33,7 @@ MOTION_RE = re.compile("|".join(MOTION_PATTERNS), re.IGNORECASE)
 PUSH_RE = re.compile(r"git\s+push\b")
 
 # Force in every form it comes in. The flags were caught from the start; the
-# refspec form — `git push origin +master` — was not, and that is how this
+# refspec form – `git push origin +master` – was not, and that is how this
 # guard got bypassed on the day it mattered. A guard with a hole only its
 # author knows about is worse than no guard: everyone else trusts it.
 #
@@ -179,7 +179,7 @@ def read_git_email(root: Path) -> str | None:
     """The git identity here, or None.
 
     A machine with no git on PATH raises rather than returns, and this runs
-    inside a PreToolUse hook — every tool call would report a failed check.
+    inside a PreToolUse hook – every tool call would report a failed check.
     An absent identity is the same situation as an unmatched one, which the
     caller already handles.
     """
@@ -208,7 +208,7 @@ def _unconfirmed_worker_reason(cfg: notes_config.NotesConfig, email: str | None)
     folders = sorted(p.name[len("docs_"):] for p in cfg.worker_dirs())
     listed = ", ".join(folders) if folders else "(없음)"
     return (
-        f"작업자가 확정되지 않았다 — git user.email `{email or '미설정'}` 이 "
+        f"작업자가 확정되지 않았다 – git user.email `{email or '미설정'}` 이 "
         f"`.claude/{CONFIG_NAME}` 의 workers 에 없다. 잘못된 id 로 기록되면 병합 때 남의 "
         f"기록에 섞인다. 등록된 작업자: {listed}. "
         f'해소: workers 에 `"<본인 id>": "{email or "<본인 git user.email>"}"` 를 추가하면 '
@@ -250,7 +250,7 @@ def decide(
 
     email = git_email if git_email is not None else read_git_email(cfg.repo_root)
     # Worker confirmation only applies where the methodology was actually
-    # adopted — a config file exists. parallel_mode defaults to true, so
+    # adopted – a config file exists. parallel_mode defaults to true, so
     # without this a `git commit` in any folder with no config (a repository
     # that never adopted this, or a session started outside one) was blocked
     # for an "unconfirmed worker" nobody was ever asked to configure.
@@ -267,15 +267,15 @@ def decide(
                 return Decision(
                     blocked=True,
                     reason=(
-                        "force push 금지 — 변경 이력 자체가 결정 기록이라 되돌리기 어렵다. "
+                        "force push 금지 – 변경 이력 자체가 결정 기록이라 되돌리기 어렵다. "
                         "이력 정리가 필요하면 트리 불변 커밋(`-s ours` 조상 연결 등)으로 할 것. "
-                        f"그래도 해야 한다면 `{FORCE_OVERRIDE_ENV}` 에 이유를 담아 실행할 것 — "
+                        f"그래도 해야 한다면 `{FORCE_OVERRIDE_ENV}` 에 이유를 담아 실행할 것 – "
                         f"스위치가 아니라 이유다({FORCE_OVERRIDE_MIN_CHARS}자 이상). 그 이유는 "
                         f"세션에 그대로 남는다"
                     ),
                 )
             decision.warnings.append(
-                f"force push 를 이유와 함께 허용했다 — \"{reason}\". "
+                f"force push 를 이유와 함께 허용했다 – \"{reason}\". "
                 f"되돌리려면 지워질 커밋을 미리 태그나 브랜치로 붙잡아 둘 것"
             )
             return decision
@@ -286,7 +286,7 @@ def decide(
                     return Decision(
                         blocked=True,
                         reason=(
-                            f"`{repo}` 는 참고 저장소라 push 금지 — 대조·이식 출처로만 쓴다. "
+                            f"`{repo}` 는 참고 저장소라 push 금지 – 대조·이식 출처로만 쓴다. "
                             f"고칠 것이 있으면 작업 저장소에 반영하고 ADR·게이트로 기록할 것"
                         ),
                     )
@@ -298,7 +298,7 @@ def decide(
                     blocked=True,
                     reason=(
                         f"{GATE_NAME} 에 OPEN 항목이 {open_items}건 남아 있어 실장비 모션 명령을 "
-                        f"실행하지 않는다. 항목은 사람 확인자만 닫을 수 있다 — 확인자가 게이트를 "
+                        f"실행하지 않는다. 항목은 사람 확인자만 닫을 수 있다 – 확인자가 게이트를 "
                         f"닫은 뒤 다시 시도할 것"
                     ),
                 )
@@ -324,7 +324,7 @@ def decide(
         is_gate = path.name == GATE_NAME
 
         # The config records the answer and the gate carries safety
-        # information, so neither may be blocked by a missing answer —
+        # information, so neither may be blocked by a missing answer –
         # otherwise the block has no way out from inside the session.
         if worker_unknown and not is_gate and path.name not in CONFIG_NAMES and _is_record(path, cfg):
             return Decision(blocked=True, reason=_unconfirmed_worker_reason(cfg, email))
@@ -333,14 +333,14 @@ def decide(
             return Decision(
                 blocked=True,
                 reason=(
-                    "게이트 항목의 확인자 칸은 에이전트가 채우지 않는다 — 실장비 검증을 "
+                    "게이트 항목의 확인자 칸은 에이전트가 채우지 않는다 – 실장비 검증을 "
                     "대신할 수 없기 때문이다. 사람 담당자가 실명으로 채운다"
                 ),
             )
 
         if cfg.parallel_mode and _under(path, cfg.docs_dir) and not is_gate:
             decision.warnings.append(
-                f"병행 기간에 메인 docs/ 는 동결이다 — {path.name} 변경은 자기 "
+                f"병행 기간에 메인 docs/ 는 동결이다 – {path.name} 변경은 자기 "
                 f"docs_<id>/ 에 하거나, 기계적 정합화라면 그 사실을 커밋 메시지에 남길 것"
             )
 
@@ -352,7 +352,7 @@ def decide(
             )
             if new_paths:
                 decision.warnings.append(
-                    f"문서에 로컬 절대경로를 새로 적었다 ({', '.join(sorted(new_paths))}) — "
+                    f"문서에 로컬 절대경로를 새로 적었다 ({', '.join(sorted(new_paths))}) – "
                     f"머신마다 달라진다. 저장소를 가리킬 땐 저장소 이름만 쓸 것"
                 )
 

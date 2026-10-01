@@ -70,7 +70,7 @@ def test_adoption_records_both_workers_so_neither_is_asked(team):
 
 
 def test_the_joining_worker_gets_the_rules_from_the_clone(team):
-    """No sync, no install step for the rules themselves — the snapshot came
+    """No sync, no install step for the rules themselves – the snapshot came
     with the repository."""
     pjm = team["pjm"]
 

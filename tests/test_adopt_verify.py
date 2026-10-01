@@ -18,7 +18,7 @@ def adopted(tmp_path):
         "notesDir": ".", "board": "STATE.md", "decisionsDir": "decisions",
         "adrStyle": "adr-prefixed",
     }))
-    # The board links the decision it records — the ordinary shape of a
+    # The board links the decision it records – the ordinary shape of a
     # repository worth adopting, and the one that makes `apply` rewrite a
     # link inside a document it also moves.
     write(
@@ -31,7 +31,7 @@ def adopted(tmp_path):
     notes_adopt.run_git(root, "config", "user.name", "t")
     notes_adopt.run_git(root, "add", "-A")
     notes_adopt.run_git(root, "commit", "-m", "init")
-    # `apply` refuses to run without a plan already on disk — the person
+    # `apply` refuses to run without a plan already on disk – the person
     # (or model) is meant to see the proposal and resolve any `?` before
     # anything moves. Every test here stands in for that step.
     notes_adopt.write_mapping(root, notes_adopt.plan(root), None)
@@ -48,7 +48,7 @@ def test_a_clean_adoption_verifies(adopted):
 
 def test_only_link_destinations_change_in_a_moved_document(adopted):
     # A moved document is not byte-identical to its original when `apply`
-    # repointed a link inside it — that rewrite is the whole point. What is
+    # repointed a link inside it – that rewrite is the whole point. What is
     # guaranteed is narrower and still checkable: everything except the
     # link destinations is the same text.
     before = (adopted / "STATE.md").read_text(encoding="utf-8")
@@ -132,7 +132,7 @@ def test_the_mapping_is_left_for_later(adopted):
 def test_apply_does_not_sweep_unrelated_work_into_its_commit(adopted):
     # A pre-existing repository has other in-progress, uncommitted work
     # that has nothing to do with adoption. `apply` must never `git add -A`
-    # in that case — only its own scoped changes (.gitignore, moved files).
+    # in that case – only its own scoped changes (.gitignore, moved files).
     write(adopted / "unrelated.txt", "손대지 않은 작업\n")
 
     notes_adopt.apply(adopted, today="20260901")
@@ -199,7 +199,7 @@ def test_merging_a_document_into_itself_is_blocked(adopted):
 
 
 def test_apply_without_a_plan_is_blocked_and_touches_nothing(tmp_path):
-    # `plan` is the approval gate — a person (or model) sees the proposal
+    # `plan` is the approval gate – a person (or model) sees the proposal
     # and resolves every `?` before anything is allowed to move. `apply`
     # must not silently generate one behind that gate.
     root = tmp_path / "proj"
@@ -220,7 +220,7 @@ def test_apply_without_a_plan_is_blocked_and_touches_nothing(tmp_path):
 
 
 def test_a_mid_move_failure_names_the_real_tag_and_backup(adopted, monkeypatch, capsys):
-    # A backup and restore tag already exist by the time `move_all` runs —
+    # A backup and restore tag already exist by the time `move_all` runs –
     # the person needs to be told exactly how to use them, not just that
     # something broke.
     import subprocess
@@ -245,7 +245,7 @@ def test_a_mid_move_failure_names_the_real_tag_and_backup(adopted, monkeypatch, 
 
 def test_a_pre_backup_failure_gives_no_restore_guidance(tmp_path, capsys):
     # Nothing was written yet (no mapping, so `apply` refuses immediately)
-    # — telling the person to restore something that was never touched
+    # – telling the person to restore something that was never touched
     # invents a problem that does not exist.
     root = tmp_path / "proj"
     write(root / "STATE.md", "# 현황\n")
@@ -264,7 +264,7 @@ def test_a_pre_backup_failure_gives_no_restore_guidance(tmp_path, capsys):
 
 
 def test_a_merge_target_is_what_verify_checks(adopted):
-    # A mapping may carry both fields — a person resolving `?` fills in
+    # A mapping may carry both fields – a person resolving `?` fills in
     # `to` and then decides the document should be merged instead. The
     # merge is what actually happened, so it is what must be checked; the
     # stale `to` names a path that was never created.
@@ -289,7 +289,7 @@ def test_the_mapping_records_the_restore_tag(adopted):
 
 def test_verify_names_the_tag_that_exists_not_todays(adopted, capsys):
     # Adopting yesterday and verifying today used to print a tag nobody
-    # ever created — precisely when a person needs the command to work.
+    # ever created – precisely when a person needs the command to work.
     notes_adopt.apply(adopted, today="20260101")
     (adopted / "PROGRESS.md").unlink()
 
@@ -316,7 +316,7 @@ def test_verify_leads_with_the_backup_not_a_partial_checkout(adopted, capsys):
 
 def test_an_undecodable_document_is_named_not_a_traceback(adopted, capsys):
     # One .md saved in cp949 used to end the run in a UnicodeDecodeError
-    # that did not even say which file — with a backup and a tag already
+    # that did not even say which file – with a backup and a tag already
     # made and no word about either.
     (adopted / "docs").mkdir(exist_ok=True)
     (adopted / "docs" / "옛문서.md").write_bytes("# 옛 문서\n".encode("cp949"))
@@ -334,7 +334,7 @@ def test_an_undecodable_document_is_named_not_a_traceback(adopted, capsys):
 
 def test_an_unreadable_backup_copy_fails_verification_without_a_traceback(adopted):
     # The skeleton comparison reads the backup's original. If that copy
-    # cannot be decoded, the verification did not finish — which is a
+    # cannot be decoded, the verification did not finish – which is a
     # failure, never a traceback out of `verify()`.
     notes_adopt.apply(adopted, today="20260901")
     backup = adopted.parent / f"{adopted.name}-girok-backup-20260901"

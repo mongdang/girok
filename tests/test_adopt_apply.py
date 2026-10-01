@@ -1,6 +1,6 @@
 """Refusing to move, and then moving.
 
-"Clean" is not `git status` being empty — an unpushed commit is fine and a
+"Clean" is not `git status` being empty – an unpushed commit is fine and a
 build artifact nobody tracks is fine. What matters is that every file about
 to move is committed, because the restore tag can only hold what was
 committed.
@@ -78,7 +78,7 @@ def test_an_untracked_file_inside_the_plan_blocks(repo):
 
 def test_an_untracked_file_inside_a_new_directory_blocks(repo):
     # Git folds a never-tracked directory into one `?? newdir/` line unless
-    # asked to list it in full — a planned document inside it must still
+    # asked to list it in full – a planned document inside it must still
     # be caught, not hidden behind the folded line.
     write(repo / "newdir" / "doc.md", "# 새\n")
     mapping = _mapping([
@@ -113,8 +113,8 @@ def test_moving_uses_git_so_history_follows(repo):
 
     assert (repo / "PROGRESS.md").is_file()
     assert not (repo / "STATE.md").exists()
-    # move_all only stages the rename — apply commits once, after everything
-    # is done — so the test commits here to check what the staged rename
+    # move_all only stages the rename – apply commits once, after everything
+    # is done – so the test commits here to check what the staged rename
     # will look like in history once that happens.
     notes_adopt.run_git(repo, "commit", "-m", "move")
     log = notes_adopt.run_git(repo, "log", "--follow", "--name-only", "--", "PROGRESS.md")
@@ -224,7 +224,7 @@ def test_the_config_update_is_recorded_in_the_mapping(tmp_path):
 
 
 def test_a_custom_doc_root_keeps_being_linted(tmp_path):
-    # Documents land in `docs/`, so `docs` has to be a doc root — but the
+    # Documents land in `docs/`, so `docs` has to be a doc root – but the
     # roots the repository already declared are not ours to drop.
     import json
 
@@ -356,7 +356,7 @@ def test_an_explicit_reset_may_replan_from_scratch(tmp_path):
 def test_the_safety_gate_lands_where_the_hook_looks_for_it(tmp_path):
     # Keeping the name is half the fix. The gate is opened at
     # `cfg.docs_dir / "SAFETY_GATE.md"`, and `docs_dir` is the *first*
-    # doc root — so a config listing `docs` second leaves the hook reading
+    # doc root – so a config listing `docs` second leaves the hook reading
     # a path the file no longer occupies: no gate, nothing OPEN, real
     # motion commands allowed through. And `verify` passes.
     import notes_config
@@ -401,7 +401,7 @@ def test_an_exception_that_refuses_attributes_still_reports_the_safety_net(
     tmp_path, monkeypatch, capsys,
 ):
     # Attaching the tag to the exception must not become the failure that
-    # gets reported — the original error and the safety net are what the
+    # gets reported – the original error and the safety net are what the
     # person needs.
     class Immutable(Exception):
         def __setattr__(self, name, value):

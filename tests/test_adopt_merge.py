@@ -76,7 +76,7 @@ def test_missing_lines_ignores_blank_lines():
 
 
 def test_untracked_source_falls_back_to_plain_delete(repo):
-    # Never `git add`-ed, so `git rm` cannot find it in the index — this is
+    # Never `git add`-ed, so `git rm` cannot find it in the index – this is
     # the normal, harmless reason `git rm` fails.
     write(repo / "DRAFT.md", "# 초안\n\n버려질 예정\n")
 
@@ -90,7 +90,7 @@ def test_untracked_source_falls_back_to_plain_delete(repo):
 def test_tracked_source_blocks_instead_of_silently_deleting(repo, monkeypatch):
     # A tracked source whose `git rm` fails for some other reason (a lock,
     # a permission error, a broken .git) must not be deleted out from under
-    # git's index — that would leave the working tree and the index
+    # git's index – that would leave the working tree and the index
     # disagreeing about whether the file exists.
     real_run_git = notes_adopt.run_git
 
@@ -129,7 +129,7 @@ def test_a_merge_target_that_moved_says_where_it_went(repo):
 
 
 def test_apply_blocks_a_merge_written_with_the_pre_move_name(tmp_path):
-    # The person reads the mapping and writes `merge: "STATE.md"` — the name
+    # The person reads the mapping and writes `merge: "STATE.md"` – the name
     # they see. By the time merges run, `STATE.md` is already `PROGRESS.md`.
     import json
 

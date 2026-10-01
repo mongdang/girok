@@ -1,4 +1,4 @@
-"""README 이미지 생성기 — 실제 실행 출력을 터미널 카드 SVG 로 렌더한다.
+"""README 이미지 생성기 – 실제 실행 출력을 터미널 카드 SVG 로 렌더한다.
 
     python ci/make_images.py
 
@@ -35,7 +35,7 @@ def esc(s: str) -> str:
 
 
 def width_of(s: str) -> float:
-    """Monospace 폭 추정 — CJK 는 전각으로 센다."""
+    """Monospace 폭 추정 – CJK 는 전각으로 센다."""
     w = 0.0
     for ch in s:
         w += FS if ord(ch) > 0x2000 else FS * 0.6
@@ -76,7 +76,7 @@ def render_line(text: str, x: float, y: float) -> str:
     )
 
 
-# 값을 나란히 세워야 하는 줄은 (라벨, 값) 으로 적는다 — 한글은 전각이라
+# 값을 나란히 세워야 하는 줄은 (라벨, 값) 으로 적는다 – 한글은 전각이라
 # 공백으로 맞춘 열이 SVG 에서는 어긋난다
 
 
@@ -132,7 +132,7 @@ def terminal(title: str, lines: list) -> str:
 CARDS: dict[str, tuple[str, list[str]]] = {}
 
 CARDS["survey"] = (
-    "/notes — 뼈대를 만들기 전에 저장소부터 읽는다",
+    "/notes – 뼈대를 만들기 전에 저장소부터 읽는다",
     [
         "$ /notes",
         "",
@@ -149,14 +149,14 @@ CARDS["survey"] = (
         "",
         "살펴볼 것 1건:",
         "  - `CLAUDE.md` 가 아카이브 폴더를 만들지 않는다고 못 박아 뒀다",
-        "    — 그 관례를 따라 archive 모듈을 끈다",
+        "    – 그 관례를 따라 archive 모듈을 끈다",
         "",
-        "이건 제안이다 — 아무것도 쓰지 않았다. 사람이 확인한 뒤 초기화할 것.",
+        "이건 제안이다 – 아무것도 쓰지 않았다. 사람이 확인한 뒤 초기화할 것.",
     ],
 )
 
 CARDS["init"] = (
-    "확인을 받은 뒤에야 만든다 — 이미 있는 파일은 건드리지 않는다",
+    "확인을 받은 뒤에야 만든다 – 이미 있는 파일은 건드리지 않는다",
     [
         "$ /notes  →  확인",
         "",
@@ -182,12 +182,12 @@ CARDS["session"] = (
         "",
         "[girok] ready v0.18.0",
         "작업자 abc (git user.email 로 확정)",
-        "현황판 notes/docs_abc/PROGRESS.md — 활성 위험 0건, 열린 질문 0건",
+        "현황판 notes/docs_abc/PROGRESS.md – 활성 위험 0건, 열린 질문 0건",
         "안전 게이트 OPEN 1건",
         "",
         "안전: 게이트 OPEN 항목이 남아 있는 동안 실장비 모션 명령(원점복귀·이동·",
         "자동 테스트)을 실행하거나 안내하지 않는다. 항목의 확인자 칸은 사람만",
-        "채운다 — 에이전트가 채우지 않는다.",
+        "채운다 – 에이전트가 채우지 않는다.",
     ],
 )
 
@@ -196,13 +196,13 @@ CARDS["lint"] = (
     [
         "$ python notes/.method/scripts/check_docs.py",
         "",
-        "[실패] notes/docs/SETUP.md -> 표가 빈 줄로 끊김 — 14번째 줄부터의 행이",
+        "[실패] notes/docs/SETUP.md -> 표가 빈 줄로 끊김 – 14번째 줄부터의 행이",
         "       표 밖 텍스트로 렌더링됨",
         "[실패] notes/docs/SETUP.md -> 목차 앵커 `#보정-절차` 에 대응하는 헤더가 없음",
         "[실패] notes/docs/SETUP.md -> 존재하지 않는 ADR-042 인용",
         "[주의] notes/CLAUDE.md -> `## 목차` 가 없다 (2,479바이트)",
         "[주의] notes/docs/SETUP.md -> 로컬 절대경로가 있다 (C:\\Users\\abc\\build)",
-        "       — 머신마다 달라진다. 저장소 이름과 상대경로로만 쓸 것",
+        "       – 머신마다 달라진다. 저장소 이름과 상대경로로만 쓸 것",
         "",
         "7개 문서 검사, 3건 실패",
     ],
@@ -213,13 +213,13 @@ CARDS["block"] = (
     [
         "$ git push origin +master",
         "",
-        "[차단] force push 금지 — 변경 이력 자체가 결정 기록이라 되돌리기 어렵다.",
+        "[차단] force push 금지 – 변경 이력 자체가 결정 기록이라 되돌리기 어렵다.",
         "       이력 정리가 필요하면 트리 불변 커밋(`-s ours` 조상 연결 등)으로",
         "       할 것. 그래도 해야 한다면 GIROK_FORCE_PUSH_REASON 에 이유를 담아",
-        "       실행할 것 — 스위치가 아니라 이유다(8자 이상). 그 이유는 세션에",
+        "       실행할 것 – 스위치가 아니라 이유다(8자 이상). 그 이유는 세션에",
         "       그대로 남는다",
         "",
-        '$ GIROK_FORCE_PUSH_REASON="이력 리셋 — 사용자 지시 2026-09-01" \\',
+        '$ GIROK_FORCE_PUSH_REASON="이력 리셋 – 사용자 지시 2026-09-01" \\',
         "    git push origin +master",
         "",
         "[girok] 규칙을 어겼다: force push · 이유가 세션 기록에 남았다",
@@ -228,10 +228,10 @@ CARDS["block"] = (
 
 
 HERO_KO = {
-    "label": "girok — 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다",
+    "label": "girok – 문서 규칙은 한 곳에만 두고, 모든 저장소가 같은 규칙을 따르게 한다",
     "line1": "문서 규칙은 한 곳에만 두고,",
     "line2": ("모든 저장소가 ", "같은", " 규칙을 따르게 한다"),
-    "sub": "A documentation methodology as a Claude Code plugin — the rules ship frozen into every repo that adopts them.",
+    "sub": "A documentation methodology as a Claude Code plugin – the rules ship frozen into every repo that adopts them.",
     "chips": [
         ("현황판 · ADR", GREEN, "#182119"),
         ("문서 검사기", AMBER, "#211D16"),
@@ -247,7 +247,7 @@ HERO_KO = {
 }
 
 def sans_width(s: str, fs: float) -> float:
-    """비례 글꼴 폭 추정 — CJK 는 전각, 라틴은 대략 0.55em."""
+    """비례 글꼴 폭 추정 – CJK 는 전각, 라틴은 대략 0.55em."""
     return sum(fs if ord(c) > 0x2000 else fs * 0.55 for c in s)
 
 

@@ -2,7 +2,7 @@
 stdin, a JSON response on stdout, an exit code.
 
 The response shape is worth testing on its own, because a malformed block is
-ignored rather than rejected — a check nobody can see failing is worse than
+ignored rather than rejected – a check nobody can see failing is worse than
 no check, since everyone believes it is running.
 """
 import json
@@ -27,7 +27,7 @@ def run_hook(
     """Run a hook the way Claude Code does.
 
     `hooks_dir` exists so the same checks can be pointed at the committed
-    copies in .method/hooks/ — the ones a machine without the plugin runs.
+    copies in .method/hooks/ – the ones a machine without the plugin runs.
     """
     proc = subprocess.run(
         [sys.executable, str(hooks_dir / f"{name}.py")],
@@ -213,7 +213,7 @@ def test_a_payload_without_cwd_does_not_report_on_some_other_directory(ready_rep
 
 def test_a_korean_payload_sent_as_real_utf8_is_read_correctly(ready_repo):
     """Claude Code does not ASCII-escape its JSON. Reading stdin through the
-    locale encoding — cp949 on a Korean Windows install — mangles a prompt
+    locale encoding – cp949 on a Korean Windows install – mangles a prompt
     or a path written in Korean. Every earlier test passed only because
     json.dumps escapes by default."""
     write(
@@ -297,7 +297,7 @@ def without_the_plugin(tmp_path):
 
     PYTHONPATH goes too: pytest puts the plugin's own hooks/ and scripts/ on
     the path, and inheriting that would let the snapshot copy import the
-    plugin's modules — the test would pass for the wrong reason.
+    plugin's modules – the test would pass for the wrong reason.
     """
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["CLAUDE_PLUGIN_ROOT"] = str(tmp_path / "no-plugin-here")

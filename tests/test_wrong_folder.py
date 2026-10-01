@@ -1,8 +1,8 @@
 """Being launched somewhere that is not a repository.
 
 Claude Code has no repository picker: the folder it was started in is the
-subject. Starting it one level too high — in a directory that merely
-*contains* repositories — used to resolve the notes folder to whichever
+subject. Starting it one level too high – in a directory that merely
+*contains* repositories – used to resolve the notes folder to whichever
 sibling happened to have a `docs/`, i.e. a different project entirely.
 
 Walking *up* from a subfolder is fine and expected. Wandering *down* into a
@@ -98,7 +98,7 @@ def test_a_configured_directory_is_a_repository_even_without_git(tmp_path):
 def test_the_message_offers_both_readings(workspace, capsys):
     """Two different situations produce this: started one level too high, or
     a project that genuinely is not under git yet. The second one has a
-    different answer — `git init` — and the methodology depends on git for
+    different answer – `git init` – and the methodology depends on git for
     version tracking, merging and the commit-then-push rule, so saying so is
     the useful part."""
     notes_init.main(["--root", str(workspace), "--confirm", workspace.name])

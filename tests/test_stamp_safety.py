@@ -1,7 +1,7 @@
 """What the stamp refresh is allowed to touch.
 
 This is the only place the plugin writes into a document a person wrote, so
-it gets its own tests. It must change one line and nothing else — including
+it gets its own tests. It must change one line and nothing else – including
 the parts of a file nobody looks at, like its line endings.
 """
 import doc_followup

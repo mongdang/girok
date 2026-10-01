@@ -6,7 +6,7 @@
 # made through a web UI reaches the repository entirely unchecked. Hooks are
 # fast feedback; this is the guarantee.
 #
-# Azure Pipelines or any other runner works the same way — the three
+# Azure Pipelines or any other runner works the same way – the three
 # commands are what matter, not the YAML around them.
 
 name: girok
@@ -32,7 +32,7 @@ jobs:
         run: |
           dir=$(find . -type d -name .method -not -path "./.git/*" | head -1)
           if [ -z "$dir" ]; then
-            echo "::error::.method/ 스냅샷이 없다 — /notes 로 초기화할 것"
+            echo "::error::.method/ 스냅샷이 없다 – /notes 로 초기화할 것"
             exit 1
           fi
           echo "dir=$dir" >> "$GITHUB_OUTPUT"

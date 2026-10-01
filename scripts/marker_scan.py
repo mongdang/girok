@@ -2,10 +2,10 @@
 
 Two markers, spelled exactly, so a single grep finds every one of them:
 
-- `SAFETY-STUB` — a safety judgement (in-position, interlock, limit) that is
+- `SAFETY-STUB` – a safety judgement (in-position, interlock, limit) that is
   temporarily allowed to pass. The default for such a stub is fail-safe, so
   this marker only appears where the stub passes instead of blocks.
-- `VIRTUAL-BYPASS` — a branch that only exists for simulated runs, to be
+- `VIRTUAL-BYPASS` – a branch that only exists for simulated runs, to be
   reviewed exhaustively before the code drives real hardware.
 
 Both must be registered in `docs/SAFETY_GATE.md`. This script reports the
@@ -74,7 +74,7 @@ def _doc_areas(cfg: notes_config.NotesConfig) -> list[Path]:
     """The folders that hold documents rather than code.
 
     Excluding the whole notes tree is wrong when the notes root *is* the
-    repository root — that layout would exclude every source file and the
+    repository root – that layout would exclude every source file and the
     scan would always come back empty. So the exclusion is by doc area:
     the doc roots, the decisions folder, the worker folders, `.method/`.
     """
@@ -102,7 +102,7 @@ def walk_files(root: Path, skip: set[str]):
     """Every file under `root`, with the skipped folders actually pruned.
 
     `rglob("*")` still descends into `.git` and `node_modules` and filters
-    afterwards, which on a real checkout is most of the walk — and all of it
+    afterwards, which on a real checkout is most of the walk – and all of it
     wasted. `os.walk` can be told not to go in.
     """
     for dirpath, dirnames, filenames in os.walk(root):
@@ -145,7 +145,7 @@ def _registered(marker: Marker, gate: str) -> bool:
     """A marker counts as registered when the gate names the file it is in.
 
     Matching on the file name rather than the exact line keeps the gate
-    readable — an item describes a condition, not a line number that moves
+    readable – an item describes a condition, not a line number that moves
     with every edit.
     """
     return Path(marker.path).name in gate
@@ -165,7 +165,7 @@ def run(start: Path | str = ".") -> Result:
     if gate is None:
         if result.markers:
             result.problems.append(
-                f"{_gate_path(cfg)} 없음 — 마커 {len(result.markers)}건이 등재될 곳이 없다"
+                f"{_gate_path(cfg)} 없음 – 마커 {len(result.markers)}건이 등재될 곳이 없다"
             )
         return result
 
@@ -183,8 +183,8 @@ def check_staged(
     """Commit-time check: a new marker and its gate entry in one commit.
 
     This runs when `git commit` is invoked, not when a file is edited.
-    Blocking at edit time would forbid the normal order of work — write the
-    marker, then register it — and would teach people to bypass the hook.
+    Blocking at edit time would forbid the normal order of work – write the
+    marker, then register it – and would teach people to bypass the hook.
     """
     cfg = notes_config.load(start)
     result = Result()
@@ -251,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         result = run(args.root)
 
     if result.skipped:
-        print("safetyGate 모듈이 꺼져 있음 — 건너뜀")
+        print("safetyGate 모듈이 꺼져 있음 – 건너뜀")
         return 0
 
     for problem in result.problems:

@@ -8,7 +8,7 @@ second, empty set of documents next to the real ones.
 
 This proposes a layout and reports what it noticed. It never writes. Getting
 the mapping wrong is cheap while it is a proposal and expensive once it is a
-file tree, so the output is something a person approves — not applies.
+file tree, so the output is something a person approves – not applies.
 
     python notes_survey.py            # 사람이 읽는 보고
     python notes_survey.py --json     # /notes 가 읽는 제안
@@ -70,7 +70,7 @@ def _walk(root: Path):
     """Every folder and file under `root`, with skipped folders pruned.
 
     `rglob("*")` walks into `.git` and `node_modules` and discards them
-    afterwards — on a real checkout that is most of the traversal, and this
+    afterwards – on a real checkout that is most of the traversal, and this
     runs before anything else `/notes` does.
     """
     for dirpath, dirnames, filenames in os.walk(root):
@@ -90,7 +90,7 @@ def _notes_dir(root: Path) -> Path:
     """Where the documentation tree lives.
 
     Prefer a folder that holds both a `docs/` subfolder and its own rule file
-    — that is the shape of a notes folder beside the source. Otherwise the
+    – that is the shape of a notes folder beside the source. Otherwise the
     repository root.
     """
     for path in sorted(_walk(root)):
@@ -152,7 +152,7 @@ def _board(
 
     if not candidates:
         survey.note(
-            "현황판으로 볼 문서를 찾지 못했다 — 지금 상태를 담는 문서가 없거나 이름이 "
+            "현황판으로 볼 문서를 찾지 못했다 – 지금 상태를 담는 문서가 없거나 이름이 "
             "다르다. 어느 파일이 현황판인지 알려주거나, 새로 만들 것"
         )
         return None
@@ -166,7 +166,7 @@ def _board(
     if len(candidates) > 1:
         others = ", ".join(p.name for _, p in candidates[1:])
         survey.note(
-            f"현황판 후보가 여럿이다 — `{best_path.name}` 을 골랐고 다른 후보는 {others} 다. "
+            f"현황판 후보가 여럿이다 – `{best_path.name}` 을 골랐고 다른 후보는 {others} 다. "
             f"틀렸으면 알려줄 것"
         )
     return best_path.name
@@ -188,7 +188,7 @@ def _decisions(notes_dir: Path, survey: Survey) -> tuple[str | None, str]:
         if not (path / "README.md").is_file():
             survey.note(
                 f"`{rel}/` 에 결정이 {len(prefixed) + len(numbered)}건 있는데 "
-                f"인덱스(`README.md`)가 없다 — 다른 문서가 ID로 인용할 근거가 없다"
+                f"인덱스(`README.md`)가 없다 – 다른 문서가 ID로 인용할 근거가 없다"
             )
         style = "numbered" if len(numbered) > len(prefixed) else "adr-prefixed"
         return rel, style
@@ -199,7 +199,7 @@ def _decisions(notes_dir: Path, survey: Survey) -> tuple[str | None, str]:
 def _decision_homes(notes_dir: Path, decisions_rel: str | None) -> set[Path]:
     """Every folder where a decision legitimately lives.
 
-    During parallel work a decision belongs in `docs_<id>/decisions/` — the
+    During parallel work a decision belongs in `docs_<id>/decisions/` – the
     rules say so. Treating those as strays flagged eight correctly placed
     files the first time this ran on a real repository.
     """
@@ -222,7 +222,7 @@ def _strays(notes_dir: Path, decisions_rel: str | None, survey: Survey) -> None:
             continue
         if ADR_PREFIXED.match(path.name):
             survey.note(
-                f"`{path.name}` 가 결정 기록처럼 보이는데 `{decisions_rel}/` 밖에 있다 — "
+                f"`{path.name}` 가 결정 기록처럼 보이는데 `{decisions_rel}/` 밖에 있다 – "
                 f"인덱스에 없으면 아무도 찾지 못한다"
             )
 
@@ -243,14 +243,14 @@ def _safety(root: Path, notes_dir: Path, doc_roots: list[str], survey: Survey) -
         for marker in SAFETY_MARKERS:
             if marker in text:
                 survey.note(
-                    f"코드에 `{marker}` 가 있는데 안전 게이트 문서가 없다 — 등재되지 않은 "
+                    f"코드에 `{marker}` 가 있는데 안전 게이트 문서가 없다 – 등재되지 않은 "
                     f"안전 우회다. 안전 모듈을 켜고 게이트에 등재할 것"
                 )
                 return True
         lowered = text.lower()
         if any(hint in lowered for hint in HARDWARE_HINTS):
             survey.note(
-                "코드에 인터락·모션 관련 표현이 있다 — 실장비를 제어하는 프로젝트라면 "
+                "코드에 인터락·모션 관련 표현이 있다 – 실장비를 제어하는 프로젝트라면 "
                 "안전 모듈을 켜는 쪽을 권한다"
             )
             return True
@@ -289,7 +289,7 @@ def _archive(notes_dir: Path, doc_roots: list[str], markdown: list[Path], survey
         text = path.read_text(encoding="utf-8", errors="replace")
         if NO_ARCHIVE_HINT.search(text):
             survey.note(
-                f"`{path.name}` 가 아카이브 폴더를 만들지 않는다고 못 박아 뒀다 — "
+                f"`{path.name}` 가 아카이브 폴더를 만들지 않는다고 못 박아 뒀다 – "
                 f"그 관례를 따라 archive 모듈을 끈다"
             )
             return False
@@ -312,7 +312,7 @@ def _sizes(notes_dir: Path, board: str | None, markdown: list[Path], survey: Sur
         size = path.stat().st_size
         if size > limit:
             survey.note(
-                f"`{path.name}` 크기가 {size:,}바이트로 기준({limit:,})을 넘는다 — "
+                f"`{path.name}` 크기가 {size:,}바이트로 기준({limit:,})을 넘는다 – "
                 f"완결된 서사를 아카이브로 옮길 때다"
             )
 
@@ -354,7 +354,7 @@ def run(start: Path | str = ".") -> Survey:
         "mergeOwner": next(iter(workers), None),
         "modules": {"safetyGate": safety, "archive": archive},
         # Worker folders only. Several author emails is not evidence of several
-        # people — one person on a laptop, a desktop and a notebook runtime
+        # people – one person on a laptop, a desktop and a notebook runtime
         # produces four. Turning parallel mode on for that would block every
         # write until `workers` named identities that are all the same person.
         "parallelMode": bool(workers),
@@ -364,7 +364,7 @@ def run(start: Path | str = ".") -> Survey:
     authors = _git_authors(root)
     if not workers and len(authors) > 1:
         survey.note(
-            f"커밋 이메일이 {len(authors)}개다 ({', '.join(authors[:4])}) — 사람이 여럿이면 "
+            f"커밋 이메일이 {len(authors)}개다 ({', '.join(authors[:4])}) – 사람이 여럿이면 "
             f"병행 작업을 켜고 `workers` 를 채울 것. 한 사람이 여러 머신을 쓰는 것이라면 "
             f"지금대로 끈 채 두면 된다"
         )
@@ -401,7 +401,7 @@ def _compare(cfg: notes_config.NotesConfig, survey: Survey) -> None:
         proposed = survey.proposal.get(key)
         if proposed and current != proposed:
             survey.note(
-                f"설정의 {key} 는 `{current}` 인데 저장소에서 보이는 것은 `{proposed}` 다 — "
+                f"설정의 {key} 는 `{current}` 인데 저장소에서 보이는 것은 `{proposed}` 다 – "
                 f"둘 중 하나가 낡았다"
             )
 
@@ -414,7 +414,7 @@ def _compare(cfg: notes_config.NotesConfig, survey: Survey) -> None:
             continue
         survey.note(
             f"설정의 modules.{module} 는 `{'켬' if current else '끔'}` 인데 저장소를 보면 "
-            f"`{'켬' if proposed else '끔'}` 쪽이다 — 도입 시점의 판단이 아직 맞는지 "
+            f"`{'켬' if proposed else '끔'}` 쪽이다 – 도입 시점의 판단이 아직 맞는지 "
             f"확인할 것"
         )
 
@@ -441,7 +441,7 @@ def report(survey: Survey) -> list[str]:
         lines += ["", "살펴볼 것: 없음"]
     lines += [
         "",
-        "이건 제안이다 — 아무것도 쓰지 않았다. 사람이 확인한 뒤 초기화할 것.",
+        "이건 제안이다 – 아무것도 쓰지 않았다. 사람이 확인한 뒤 초기화할 것.",
     ]
     return lines
 

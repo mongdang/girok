@@ -7,7 +7,7 @@ PostToolUse cannot block, so this is feedback and one repair:
 - rewrite the `최종 수정` stamp from the system clock.
 
 The stamp matters more than it looks. Merges pick the newer copy by that
-line, and a stamp written from memory once sent a merge the wrong way — so
+line, and a stamp written from memory once sent a merge the wrong way – so
 it is taken from the clock rather than from whatever the model believed the
 time to be.
 """
@@ -64,7 +64,7 @@ def _under(path: Path, parent: Path) -> bool:
 def refresh_stamp(path: Path, now: str | None = None) -> bool:
     """Rewrite an existing stamp, changing one line and nothing else.
 
-    Absent stamps are left absent — only documents that carry one are managed
+    Absent stamps are left absent – only documents that carry one are managed
     this way. This is the only place anything here writes into a document a
     person wrote, so it keeps the file's own line endings: turning a CRLF file
     into LF would make a one-line stamp update appear as a diff across the
@@ -90,7 +90,7 @@ def after_command(start: Path | str, command: str, failed: bool = False) -> Foll
 
     The setup this replaced allowlisted `git push` so it needed no approval
     click, and printed a line confirming it. Without the second half,
-    "commit then push immediately" is a rule with no feedback — the
+    "commit then push immediately" is a rule with no feedback – the
     transcript does not show whether the push happened.
     """
     result = Followup()
@@ -99,10 +99,10 @@ def after_command(start: Path | str, command: str, failed: bool = False) -> Foll
         return result
     if failed:
         result.messages.append(
-            "git push 실패 — 커밋이 이 머신에만 있다. 원격·인증을 확인하고 다시 push 할 것"
+            "git push 실패 – 커밋이 이 머신에만 있다. 원격·인증을 확인하고 다시 push 할 것"
         )
     else:
-        result.messages.append("git push 완료 — 커밋이 원격에 올라갔다")
+        result.messages.append("git push 완료 – 커밋이 원격에 올라갔다")
     return result
 
 
