@@ -86,11 +86,13 @@ if ($missing.Count -gt 0) {
 
 # `add` and `install` fail when already done; `update` then brings an
 # existing copy to the current version. Only the last state is checked.
+# The scope is named: run inside a repository that has its own project-scope
+# install, a bare `update` moved that one and left the machine-wide copy old.
 $ErrorActionPreference = 'Continue'
 claude plugin marketplace add mongdang/girok 2>$null | Out-Null
 claude plugin marketplace update mongdang | Out-Null
-claude plugin install girok@mongdang 2>$null | Out-Null
-claude plugin update girok@mongdang | Out-Null
+claude plugin install girok@mongdang --scope user 2>$null | Out-Null
+claude plugin update girok@mongdang --scope user | Out-Null
 $ErrorActionPreference = 'Stop'
 
 $listed = (claude plugin list | Out-String)
