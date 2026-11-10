@@ -116,6 +116,12 @@ claude plugin marketplace add mongdang/girok
 claude plugin install girok@mongdang
 ```
 
+새 Windows PC 라면 한 줄로 된다 - git · Python · Claude Code 중 없는 것을 설치하고 플러그인까지 넣는다:
+
+```powershell
+irm https://raw.githubusercontent.com/mongdang/girok/master/install.ps1 | iex
+```
+
 Claude Code 안에서라면 `/plugin marketplace add mongdang/girok` → `/plugin install girok@mongdang`.
 설치 후 **Claude Code 를 껐다 켠다** - 훅은 세션이 시작할 때 붙는다.
 
@@ -201,6 +207,7 @@ claude
 </p>
 
 > 매일 쓰는 법·막혔을 때·문제 해결은 **[사용법 문서](docs/%EC%82%AC%EC%9A%A9%EB%B2%95.md)** 에 따로 있다.
+> 새 PC 에 환경을 갖추는 순서는 **[설치 문서](docs/%EC%84%A4%EC%B9%98.md)**.
 
 ## 하루 흐름
 

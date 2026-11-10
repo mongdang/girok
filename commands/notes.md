@@ -1,6 +1,6 @@
 ---
 description: 진행기록 체계의 상태를 보고 필요한 것을 한다 - 초기화 / sync / 재검사 / 현황 요약
-allowed-tools: Bash, Read, Edit, Write, Glob, Grep, AskUserQuestion
+allowed-tools: Bash, PowerShell, Read, Edit, Write, Glob, Grep, AskUserQuestion
 ---
 
 # /notes
@@ -9,6 +9,52 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep, AskUserQuestion
 버튼**이다. 서브명령은 없다 - 저장소 상태를 보고 필요한 동작을 판단한다.
 
 ## 절차
+
+### 0. Python 부터 확인한다
+
+아래 절차는 전부 Python 스크립트이고, 훅도 Python 으로 돈다. 없으면 `/notes` 도 훅도
+동작하지 않으므로 다른 것보다 먼저 본다.
+
+```
+python --version
+```
+
+| 결과 | 다음 |
+|---|---|
+| 3.10 이상 | §1 |
+| 명령이 없거나 3.10 미만, Windows 에서 `py -3 --version` 은 3.10 이상 | 이하 명령의 `python` 을 `py -3` 으로 바꿔 실행한다. 훅 래퍼도 같은 순서로 찾으므로 설치는 필요 없다 |
+| 쓸 수 있는 Python 이 없다 | 아래 설치 |
+
+Windows 의 `python3` 가 아무 출력 없이 끝나는 것은 Microsoft Store 바로가기다 - Python 이
+아니다. `uv python list` 에만 보이는 Python 도 PATH 에 없어 훅이 쓰지 못하니, 있다고 치지
+않는다.
+
+**설치는 승인을 받고 한다.** `AskUserQuestion` 으로 "이 PC 에 Python 3.10+ 가 없습니다 -
+지금 설치할까요?" 를 묻고, 어떤 명령을 돌릴지 그대로 보여준다. 직접 설치하겠다고 하면
+[python.org](https://www.python.org/downloads/) 를 안내하고("Add python.exe to PATH" 체크)
+여기서 멈춘다.
+
+| OS | 명령 |
+|---|---|
+| Windows | `winget install -e --id Python.Python.3.13 --scope user --accept-package-agreements --accept-source-agreements` |
+| macOS | `brew install python@3.13` |
+| Linux | 배포판 패키지 관리자(`apt install python3` 등). `sudo` 가 필요하면 실행하지 말고 명령을 사용자에게 안내한다 |
+
+`winget`·`brew` 가 없으면 설치 도구부터 깔지 않는다 - python.org 를 안내하고 멈춘다.
+
+설치 뒤에 확인할 것 둘:
+
+1. **설치됐는가.** 이 세션의 PATH 는 설치 전 그대로라 `python` 은 여전히 안 잡힌다.
+   설치된 실행 파일을 전체 경로로 불러 확인하고(Windows 사용자 범위 설치는
+   `%LOCALAPPDATA%\Programs\Python\Python313\python.exe`), 이 `/notes` 의 나머지 명령도
+   그 경로로 이어서 실행한다.
+2. **PATH 에 올라갔는가.** Windows 는 사용자 PATH(`[Environment]::GetEnvironmentVariable('Path','User')`)
+   에 그 폴더가 들어갔는지 본다. 없으면 훅이 다음 세션에서도 찾지 못한다 - 사용자에게
+   알리고, 승인을 받아 사용자 PATH 에 추가한다.
+
+> [!IMPORTANT]
+> 끝나면 **Claude Code 를 껐다 켜라고** 알린다. 훅은 세션이 물려받은 PATH 에서 Python 을
+> 찾으므로, 설치한 세션에서는 `/notes` 가 끝까지 돌아도 훅은 돌지 않는다.
 
 ### 1. 상태를 먼저 읽는다
 
@@ -63,6 +109,30 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_survey.py"
 
 기본값을 제안하되, 저장소를 보고 판단한다 - 하드웨어·모션 제어 코드가 있으면 안전
 게이트를 켜는 쪽을 제안하고, 그 근거를 말한다. `AskUserQuestion` 으로 한 번에 묻는다.
+
+**병행 작업자가 있는지는 추론으로 넘어가지 않고 반드시 묻는다.** 조사는 `docs_<id>/`
+폴더가 있는지만 보는데, 그건 지금까지의 모습이지 앞으로의 계획이 아니다. 틀리면 양쪽 다
+비싸다 - 혼자 쓰는 저장소에 병행을 켜면 쓰기가 막히고, 둘이 쓰는 저장소에 끄면 반입
+스캔이 돌지 않아 상대의 새 작업을 아무도 알려주지 않는다.
+
+"이 저장소에서 다른 사람과 함께 작업합니까?" - 조사가 찾은 `docs_<id>/` 폴더와 커밋
+이메일이 있으면 근거로 같이 보여준다.
+
+| 답 | 다음 |
+|---|---|
+| 혼자 | `--no-parallel` |
+| 함께 | 아래를 이어서 묻고 `--worker <본인 id>` 로 초기화한다 |
+
+함께 작업한다면:
+
+- **본인 id.** `git config user.email` 값을 보여주고 "이 이메일로 커밋하는 `<id>` 가
+  맞습니까?" 를 확인한다. 비어 있으면 먼저 설정하게 한다 - 작업자는 이 값으로 판별된다.
+- **상대 작업자의 id 와 git 이메일.** 초기화 뒤 `.claude/girok.json` 의 `workers` 에 직접
+  추가한다. 이메일을 모르면 비워 둔다 - 상대가 첫 세션에서 질문을 받고 채운다.
+- **master 병합·push 를 맡을 사람**(`mergeOwner`). 초기화는 본인으로 적으니, 다른 사람이면
+  고친다.
+- **원격 이름.** `git remote` 가 `origin` 이 아니면 `--remote <이름>` 을 넘긴다. 원격이
+  아직 없으면 그 사실을 알린다 - 반입 스캔은 원격이 생긴 뒤부터 돈다.
 
 승인 후:
 
@@ -206,7 +276,8 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/notes_adopt.py" plan --dry-run
 
 - 안전 게이트 OPEN 개수 (모듈이 켜져 있으면)
 - 미push 커밋 (`git status -sb`)
-- 상대 작업자의 새 내용 (`git fetch <remote>` 후 브랜치·스탬프 비교)
+- 상대 작업자의 새 내용 - `python "${CLAUDE_PLUGIN_ROOT}/hooks/incoming.py"` (세션 시작 때와
+  같은 반입 스캔을 지금 다시 돌린다. `git fetch` 만 하고 아무것도 쓰지 않는다)
 - 검사기·마커 스캔 실패 항목
 - 이식 안 된 문서 (`role` 이 `?` 이거나 제자리가 아닌 항목 수) - 사람이 "제자리로 확정"
   한 문서는 매핑에서 `role: "keep"` 이라 여기 세지 않는다

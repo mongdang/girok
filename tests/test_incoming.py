@@ -149,3 +149,91 @@ def test_the_scan_writes_nothing(pair):
 
     assert git(pair["kdh"], "status", "--porcelain").stdout == before
     assert git(pair["kdh"], "rev-parse", "HEAD").stdout == head
+
+
+def test_it_names_the_worker_whose_records_changed(pair):
+    """The question the rules ask is "`<id>` 작업자의 새로운 내용" - a branch
+    name is not a worker, the `docs_<id>/` folder that moved is."""
+    commit(pair["pjm"], "notes/docs_pjm/PROGRESS.md", "# pjm\n", "pjm 진행")
+    git(pair["pjm"], "push", "-q", "-u", "origin", "pjm")
+
+    result = incoming.scan(pair["kdh"], worker="kdh", fetch=True)
+
+    assert result.branches[0].workers == ["pjm"]
+    assert "작업자 pjm" in "\n".join(incoming.summary(result))
+
+
+def test_my_own_work_from_another_machine_is_noticed(pair, tmp_path):
+    """Excluding my branch from "incoming" used to exclude it from the
+    report altogether: work pushed from the other PC went unmentioned."""
+    commit(pair["kdh"], "notes/docs_kdh/PROGRESS.md", "# kdh\n", "kdh 진행")
+    git(pair["kdh"], "push", "-q", "-u", "origin", "kdh")
+
+    other = tmp_path / "kdh-other-pc"
+    git(tmp_path, "clone", "-q", str(tmp_path / "remote.git"), str(other))
+    git(other, "checkout", "-q", "kdh")
+    commit(other, "notes/docs_kdh/PROGRESS.md", "# kdh\n\n다른 PC\n", "다른 PC 에서")
+    git(other, "push", "-q", "origin", "kdh")
+
+    result = incoming.scan(pair["kdh"], worker="kdh", fetch=True)
+
+    assert result.branches == []
+    assert result.mine_ahead == 1
+    assert result.anything
+    assert "origin/kdh" in "\n".join(incoming.summary(result))
+
+
+def test_my_branch_need_not_be_named_after_me(pair):
+    """Mine is what this branch tracks, not only `<remote>/<worker id>`."""
+    git(pair["kdh"], "checkout", "-q", "-b", "feature/x")
+    commit(pair["kdh"], "notes/docs_kdh/PROGRESS.md", "# kdh\n", "kdh 진행")
+    git(pair["kdh"], "push", "-q", "-u", "origin", "feature/x")
+    git(pair["kdh"], "reset", "-q", "--hard", "HEAD~1")
+
+    result = incoming.scan(pair["kdh"], worker="kdh", fetch=True)
+
+    assert result.branches == []
+    assert result.mine_ahead == 1
+
+
+def test_the_remote_head_pointer_is_not_a_branch(pair):
+    """`origin/HEAD` shortens to plain `origin`, which slipped past the
+    `/HEAD` filter and was reported as a branch duplicating master."""
+    commit(pair["pjm"], "notes/docs/PROGRESS.md", "# 현황판\n\n갱신\n", "master 갱신")
+    git(pair["pjm"], "checkout", "-q", "master")
+    git(pair["pjm"], "merge", "-q", "pjm")
+    git(pair["pjm"], "push", "-q", "origin", "master")
+
+    result = incoming.scan(pair["kdh"], worker="kdh", fetch=True)
+
+    assert "origin" not in [b.name for b in result.branches]
+
+
+def test_counting_falls_back_on_a_git_without_ahead_behind(pair, monkeypatch):
+    """`%(ahead-behind:)` is git 2.41+. An older git must still count."""
+    commit(pair["pjm"], "notes/docs_pjm/PROGRESS.md", "# pjm\n", "pjm 진행")
+    git(pair["pjm"], "push", "-q", "-u", "origin", "pjm")
+    monkeypatch.setattr(incoming, "AHEAD_FORMAT", "%(refname) %(no-such-field)")
+
+    result = incoming.scan(pair["kdh"], worker="kdh", fetch=True)
+
+    assert [(b.name, b.commits) for b in result.branches] == [("origin/pjm", 1)]
+
+
+def test_it_can_be_asked_again_mid_session(pair):
+    """Session start is one look. Before a merge the same scan has to be
+    one command away, not a procedure to remember."""
+    import sys
+    from pathlib import Path
+
+    script = Path(incoming.__file__)
+    run = lambda: subprocess.run(  # noqa: E731
+        [sys.executable, str(script)], cwd=pair["kdh"],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    assert "반입 없음" in run().stdout
+
+    commit(pair["pjm"], "notes/docs_pjm/PROGRESS.md", "# pjm\n", "pjm 진행")
+    git(pair["pjm"], "push", "-q", "-u", "origin", "pjm")
+
+    assert "[반입] origin/pjm" in run().stdout
