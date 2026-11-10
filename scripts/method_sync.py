@@ -58,6 +58,7 @@ SNAPSHOT_HOOKS = (
     "pre-tool-use.py",
     "post-tool-use.py",
     "stop.py",
+    "run_hook.py",
     "run-hook.cmd",
 )
 
@@ -69,12 +70,19 @@ EXECUTABLE_IN_SNAPSHOT = "run-hook.cmd"
 # than in the settings template because the command has to name this
 # repository's own snapshot path, and a JSON template with every brace
 # doubled for str.format is a file nobody can read or edit safely.
+#
+# The timeouts are sized for a machine where each process start takes
+# seconds, not milliseconds: endpoint security that scans every executable
+# does that, and a hook that runs out of time is discarded together with
+# its check. A hook that merely reads the prompt was measured at 13s on
+# such a machine with the old 10s budget. Session start also fetches and
+# walks remote branches, one git process each.
 HOOK_EVENTS = (
-    ("SessionStart", "session-start", "startup|resume|clear|compact", 30),
-    ("UserPromptSubmit", "user-prompt-submit", None, 10),
-    ("PreToolUse", "pre-tool-use", "Bash|Edit|Write|MultiEdit|NotebookEdit", 15),
-    ("PostToolUse", "post-tool-use", "Edit|Write|MultiEdit|NotebookEdit|Bash", 20),
-    ("Stop", "stop", None, 30),
+    ("SessionStart", "session-start", "startup|resume|clear|compact", 60),
+    ("UserPromptSubmit", "user-prompt-submit", None, 30),
+    ("PreToolUse", "pre-tool-use", "Bash|Edit|Write|MultiEdit|NotebookEdit", 30),
+    ("PostToolUse", "post-tool-use", "Edit|Write|MultiEdit|NotebookEdit|Bash", 30),
+    ("Stop", "stop", None, 60),
 )
 
 # Running the snapshot's own scripts drops __pycache__ next to them, which

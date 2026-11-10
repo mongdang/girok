@@ -8,6 +8,27 @@
 
 ---
 
+## 0.21.2 - 훅이 시간 안에 끝난다 (프로세스 하나로)
+
+프로세스 하나 띄우는 데 몇 초가 걸리는 PC 가 있다 - 실행 파일마다 끼어드는 엔드포인트 보안
+제품(백신 · 문서 보안 에이전트)이 그렇게 만든다. 그런 PC 에서 `UserPromptSubmit` 훅이
+`timed out after 10s - output discarded` 로 매번 버려지고 있었다. 훅 코드는 프롬프트를
+읽고 끝나는 것이라 실측 13초의 거의 전부가 프로세스 생성이었다: bash · `git rev-parse` ·
+버전 확인용 python · 실행용 python · `dirname`.
+
+- 래퍼가 인터프리터마다 python 을 한 번만 띄운다. 버전 확인과 스크립트 실행을 새 부트스트랩
+  `hooks/run_hook.py` 가 한 프로세스에서 한다(너무 낡으면 exit 113, 래퍼는 다음 후보로).
+  Store 바로가기(exit 49)를 건너뛰는 동작은 그대로다.
+- Unix 절반에서 `dirname` 과 서브셸을 없앴다. cmd.exe 절반은 `python` 을 `py` 보다 먼저
+  본다 - 런처는 프로세스 하나가 더 든다.
+- 등록되는 훅 timeout 을 늘렸다: UserPromptSubmit 10→30, PreToolUse 15→30, PostToolUse
+  20→30, SessionStart · Stop 30→60. 시간을 넘긴 훅은 검사와 함께 버려지므로, 느린 PC 에서
+  짧은 예산은 보호를 끄는 것과 같다.
+- 이미 도입한 저장소는 `/notes` 로 sync 해야 `.method/` 와 `.claude/settings.json` 의 등록이
+  바뀐다.
+
+---
+
 ## 0.21.1 - 대시는 en dash 가 아니라 키보드 하이픈이다
 
 0.21.0 은 "키보드 0 옆의 그 문자" 를 en dash(U+2013)로 잘못 옮겼다. 원래 뜻은 하이픈(U+002D)이다.

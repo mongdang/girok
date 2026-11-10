@@ -77,6 +77,52 @@ def test_skips_a_stub_that_resolves_but_is_not_an_interpreter(tmp_path):
 
 
 @needs_bash
+def test_skips_an_interpreter_that_is_too_old(tmp_path):
+    """Too old is exit 113 from run_hook.py, not a separate probe launch.
+    The stand-in reproduces a Python that parses the bootstrap and is
+    rejected by it; the wrapper has to move on to the real one."""
+    real = shutil.which("python") or shutil.which("python3")
+    bin_dir = _fake_bin(
+        tmp_path,
+        {
+            "python3": '#!/bin/sh\nexit 113\n',
+            "python": f'#!/bin/sh\nexec "{real}" "$@"\n',
+        },
+    )
+
+    result = run_wrapper(
+        "session-start",
+        env={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        stdin='{"cwd": "%s"}' % tmp_path.as_posix(),
+    )
+
+    assert result.returncode == 0
+    assert "NOT running" not in result.stderr
+
+
+@needs_bash
+def test_launches_the_interpreter_once_per_hook(tmp_path):
+    """One process per hook. The probe-then-run shape launched two, and on
+    a machine where every process start takes seconds that second launch
+    alone pushed a hook past its time budget."""
+    real = shutil.which("python") or shutil.which("python3")
+    log = tmp_path / "launches.log"
+    bin_dir = _fake_bin(
+        tmp_path,
+        {"python3": f'#!/bin/sh\necho launch >> "{log.as_posix()}"\nexec "{real}" "$@"\n'},
+    )
+
+    result = run_wrapper(
+        "session-start",
+        env={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"},
+        stdin='{"cwd": "%s"}' % tmp_path.as_posix(),
+    )
+
+    assert result.returncode == 0
+    assert log.read_text().count("launch") == 1
+
+
+@needs_bash
 def test_says_so_loudly_when_there_is_no_usable_python(tmp_path):
     bin_dir = _fake_bin(
         tmp_path,
