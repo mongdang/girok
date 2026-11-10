@@ -48,6 +48,19 @@ def test_the_skeleton_passes_its_own_linter(empty_repo):
     assert result.ok, [f"{p.path}: {p.message}" for p in result.failures]
 
 
+@pytest.mark.parametrize("safety_gate", [True, False])
+def test_the_skeleton_draws_no_warning_from_its_own_linter(empty_repo, safety_gate):
+    """A fresh CLAUDE.md is past the size where a table of contents is asked
+    for and had none: the first `/notes` on a new repository reported a
+    warning about a file girok itself had just written."""
+    notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh", safety_gate=safety_gate)
+
+    result = check_docs.run(empty_repo)
+
+    assert result.ok, [f"{p.path}: {p.message}" for p in result.failures]
+    assert result.warnings == [], [f"{p.path}: {p.message}" for p in result.warnings]
+
+
 def test_claude_md_carries_the_bootstrap_gate(empty_repo):
     notes_init.init(empty_repo, notes_dir="notes", repo_name="fresh")
 

@@ -10,6 +10,7 @@ file should add that file, not flatten the work in the others.
 """
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -67,11 +68,10 @@ def _write(path: Path, text: str, result: InitResult, root: Path) -> None:
 
 
 def _strip_gate_section(text: str) -> str:
-    start = text.find(GATE_BEGIN)
-    end = text.find(GATE_END)
-    if start == -1 or end == -1:
-        return text
-    return text[:start].rstrip() + "\n\n" + text[end + len(GATE_END):].lstrip("\n")
+    """Drop every marked region: the section, and its line in the table of
+    contents - a contents entry left behind would point at nothing."""
+    region = re.escape(GATE_BEGIN) + r"\n.*?" + re.escape(GATE_END) + r"\n"
+    return re.sub(r"\n{3,}", "\n\n", re.sub(region, "", text, flags=re.S))
 
 
 def _keep_gate_section(text: str) -> str:
