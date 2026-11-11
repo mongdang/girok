@@ -193,6 +193,57 @@ def read_git_email(root: Path) -> str | None:
     return result.stdout.strip() or None
 
 
+# The branches that belong to everyone, so in a parallel repository to the
+# one person who merges.
+SHARED_BRANCHES = ("main", "master")
+
+
+def current_branch(root: Path) -> str | None:
+    """The branch checked out here, or None - detached, or no git to ask."""
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=root, capture_output=True, text=True,
+        )
+    except OSError:
+        return None
+    return (result.stdout.strip() or None) if result.returncode == 0 else None
+
+
+def branch_exists(root: Path, name: str, remote: str) -> bool:
+    """Whether `git switch <name>` would find the branch, here or on the remote."""
+    for ref in (f"refs/heads/{name}", f"refs/remotes/{remote}/{name}"):
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--verify", "--quiet", ref],
+                cwd=root, capture_output=True, text=True,
+            )
+        except OSError:
+            return False
+        if result.returncode == 0:
+            return True
+    return False
+
+
+def not_this_workers_branch(
+    cfg: notes_config.NotesConfig, worker: str, branch: str | None
+) -> str | None:
+    """Why `branch` is not this worker's to commit on, or None when it is fine.
+
+    Two cases only: another worker's branch, and the shared branch while
+    somebody else is named to merge. A topic branch of the worker's own is
+    ordinary work, and a shared branch with nobody named to merge is left
+    open - blocking it would block everyone, with no way to comply.
+    """
+    if not branch or branch == worker:
+        return None
+    if branch in cfg.workers:
+        return f"`{branch}` 는 다른 작업자의 브랜치다"
+    if branch in SHARED_BRANCHES and cfg.merge_owner and cfg.merge_owner != worker:
+        return f"`{branch}` 병합·커밋은 병합 담당(`{cfg.merge_owner}`)이 한다"
+    return None
+
+
 def worker_of(cfg: notes_config.NotesConfig, email: str | None) -> str | None:
     """The worker this email belongs to, or None if that is not settled.
 
@@ -305,6 +356,22 @@ def decide(
 
         if worker_unknown and re.search(r"git\s+(commit|push)\b", command):
             return Decision(blocked=True, reason=_unconfirmed_worker_reason(cfg, email))
+
+        # The rule that each worker commits on their own branch was only in
+        # the rule text. Initialization made no branch and nothing checked,
+        # so two workers committed to main until a push was rejected.
+        if cfg.source is not None and cfg.parallel_mode and re.search(r"git\s+commit\b", command):
+            worker = worker_of(cfg, email)
+            why = worker and not_this_workers_branch(cfg, worker, current_branch(cfg.repo_root))
+            if why:
+                return Decision(
+                    blocked=True,
+                    reason=(
+                        f"{why} - 작업자 `{worker}` 는 자기 브랜치에서 커밋한다. "
+                        f"`git switch {worker}` (브랜치가 아직 없으면 `git switch -c {worker}`) "
+                        f"후 다시 커밋할 것. 커밋하지 않은 변경은 브랜치를 옮겨도 그대로 따라온다"
+                    ),
+                )
         return decision
 
     if tool_name not in ("Edit", "Write", "NotebookEdit", "MultiEdit"):

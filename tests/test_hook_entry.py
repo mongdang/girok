@@ -400,3 +400,57 @@ def test_the_snapshot_stop_still_reports_to_stderr(ready_repo, tmp_path):
     )
 
     assert "girok" in err
+
+
+def prompt_in(repo, session, tmp_path):
+    env = {**os.environ, "GIROK_STATE_DIR": str(tmp_path / "state")}
+    return run_hook(
+        "user-prompt-submit",
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(repo),
+            "session_id": session,
+            "prompt": "문서 정리해줘",
+        },
+        env=env,
+    )
+
+
+def test_a_session_older_than_its_hooks_is_told_to_start_again(ready_repo, tmp_path):
+    """Claude Code picks up a settings file that appears mid-session - after a
+    pull, after `/notes` - and runs its hooks from then on. SessionStart has
+    already passed, so that session never gets the ready block, the incoming
+    scan or the branch check, and nothing said so: it looked supervised."""
+    _, out, _ = prompt_in(ready_repo, "sess-1", tmp_path)
+
+    text = out["hookSpecificOutput"]["additionalContext"]
+    assert "새로 시작" in text
+
+
+def test_the_restart_notice_is_said_once(ready_repo, tmp_path):
+    prompt_in(ready_repo, "sess-1", tmp_path)
+
+    _, out, _ = prompt_in(ready_repo, "sess-1", tmp_path)
+
+    assert out is None
+
+
+def test_a_session_that_began_under_the_hooks_is_not_told_to_restart(ready_repo, tmp_path):
+    env = {**os.environ, "GIROK_STATE_DIR": str(tmp_path / "state")}
+    run_hook(
+        "session-start",
+        {"hook_event_name": "SessionStart", "cwd": str(ready_repo), "session_id": "sess-2"},
+        env=env,
+    )
+
+    _, out, _ = prompt_in(ready_repo, "sess-2", tmp_path)
+
+    assert out is None
+
+
+def test_a_repository_that_never_adopted_this_gets_no_restart_notice(tmp_path):
+    """The plugin's hooks are registered per repository, but a user-level
+    registration would run them everywhere."""
+    _, out, _ = prompt_in(tmp_path, "sess-3", tmp_path)
+
+    assert out is None

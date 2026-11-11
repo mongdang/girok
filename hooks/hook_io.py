@@ -6,7 +6,9 @@ check, since everyone believes it is running.
 """
 import json
 import os
+import re
 import sys
+import tempfile
 from pathlib import Path
 
 PLUGIN_ROOT = Path(os.environ.get("CLAUDE_PLUGIN_ROOT", Path(__file__).resolve().parent.parent))
@@ -140,6 +142,40 @@ def cwd_of(payload: dict) -> Path:
     if not cwd:
         raise PayloadError("hook payload 에 cwd 가 없다 - 어느 저장소인지 알 수 없다")
     return Path(cwd)
+
+
+def _session_marker(payload: dict) -> Path | None:
+    session = payload.get("session_id")
+    if not isinstance(session, str) or not session:
+        return None
+    folder = os.environ.get("GIROK_STATE_DIR") or os.path.join(
+        tempfile.gettempdir(), "girok-sessions"
+    )
+    return Path(folder) / re.sub(r"[^A-Za-z0-9_.-]", "_", session)[:120]
+
+
+def mark_session(payload: dict) -> bool:
+    """Record that this session has been through its start check.
+
+    Kept outside the repository: it is a fact about a session on this
+    machine, and a file in the working tree would show up in `git status`.
+    """
+    marker = _session_marker(payload)
+    if marker is None:
+        return False
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+    except OSError:
+        return False
+    return True
+
+
+def session_marked(payload: dict) -> bool | None:
+    """Whether the session went through its start check. None when the
+    payload does not say which session this is."""
+    marker = _session_marker(payload)
+    return None if marker is None else marker.is_file()
 
 
 def emit_context(event: str, text: str) -> None:

@@ -101,6 +101,33 @@ def _resolve_worker(cfg: notes_config.NotesConfig, email: str | None) -> tuple[s
     ]
 
 
+def _branch_lines(cfg: notes_config.NotesConfig, worker: str) -> list[str]:
+    """Say so when the session opened on a branch that is not this worker's.
+
+    Said only then. A line that appears every session is not read by the
+    time it matters.
+    """
+    branch = gate_rules.current_branch(cfg.repo_root)
+    if not branch or branch == worker:
+        return []
+    if branch not in gate_rules.SHARED_BRANCHES and branch not in cfg.workers:
+        return []
+    if gate_rules.branch_exists(cfg.repo_root, worker, cfg.remote):
+        how = f"`git switch {worker}` 로 옮길 것"
+    else:
+        how = (
+            f"`git switch -c {worker}` 로 만들고 `git push -u {cfg.remote} {worker}` 로 "
+            f"올릴 것"
+        )
+    line = (
+        f"[브랜치] 지금 `{branch}` 브랜치다 - 작업자 `{worker}` 의 브랜치는 `{worker}`. "
+        f"작업을 시작하기 전에 {how}"
+    )
+    if cfg.merge_owner == worker and branch in gate_rules.SHARED_BRANCHES:
+        line += f" (병합 담당이라 `{branch}` 병합은 여기서 하지만, 평소 작업은 자기 브랜치에서 한다)"
+    return [line]
+
+
 def build(
     start: Path | str = ".",
     git_email: str | None = None,
@@ -141,6 +168,8 @@ def build(
     report.worker = worker
     report.needs_worker_answer = worker is None and bool(worker_lines)
     report.lines.extend(worker_lines)
+    if worker:
+        report.lines.extend(_branch_lines(cfg, worker))
 
     report.lines.extend(_board_summary(cfg, worker))
 

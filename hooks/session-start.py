@@ -23,6 +23,7 @@ def main() -> int:
         hook_io.fail_loud(f"세션 시작 검사 실패: {exc}")
         return 0
 
+    hook_io.mark_session(payload)
     hook_io.emit_context("SessionStart", report.text)
     return 0
 

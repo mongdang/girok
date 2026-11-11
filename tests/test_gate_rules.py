@@ -7,6 +7,8 @@ else warns, because a check that stops ordinary work gets disabled.
 Every block returns a reason and a way out. A block the person cannot act on
 just becomes a reason to turn hooks off.
 """
+import json
+
 import pytest
 
 import gate_rules
@@ -394,3 +396,85 @@ def test_none_of_this_applies_outside_parallel_mode(notes_repo):
     )
 
     assert not d.blocked
+
+
+def two_workers(notes_repo, merge_owner):
+    (notes_repo / ".claude" / "girok.json").write_text(
+        json.dumps(
+            {
+                "notesDir": "notes",
+                "modules": {"safetyGate": False},
+                "parallelMode": True,
+                "workers": {"abc": "abc@example.invalid", "xyz": "xyz@example.invalid"},
+                "mergeOwner": merge_owner,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return notes_repo
+
+
+def commit_on(repo, branch, monkeypatch, email="abc@example.invalid"):
+    monkeypatch.setattr(gate_rules, "current_branch", lambda root: branch)
+    return gate_rules.decide(repo, "Bash", {"command": 'git commit -m "작업"'}, git_email=email)
+
+
+def test_blocks_a_commit_on_main_by_someone_who_does_not_merge(notes_repo, monkeypatch):
+    """The rule said each worker commits on a branch named after them and one
+    person merges. Nothing enforced it and initialization made no branch, so
+    both workers committed straight to main and the first anyone heard of it
+    was a rejected push."""
+    repo = two_workers(notes_repo, merge_owner="xyz")
+
+    decision = commit_on(repo, "main", monkeypatch)
+
+    assert decision.blocked
+    assert "git switch" in decision.reason
+    assert "abc" in decision.reason
+
+
+def test_the_merge_owner_may_commit_on_main(notes_repo, monkeypatch):
+    """Merging into main is that person's job. Blocking it would leave the
+    repository with nobody able to merge."""
+    repo = two_workers(notes_repo, merge_owner="abc")
+
+    assert not commit_on(repo, "main", monkeypatch).blocked
+
+
+def test_allows_a_commit_on_the_worker_own_branch(notes_repo, monkeypatch):
+    repo = two_workers(notes_repo, merge_owner="xyz")
+
+    assert not commit_on(repo, "abc", monkeypatch).blocked
+
+
+def test_blocks_a_commit_on_another_worker_branch(notes_repo, monkeypatch):
+    """Merging is done into main. A commit on someone else's branch is filed
+    under their name whoever holds the merge."""
+    repo = two_workers(notes_repo, merge_owner="abc")
+
+    assert commit_on(repo, "xyz", monkeypatch).blocked
+
+
+def test_main_is_open_while_nobody_is_named_to_merge(notes_repo, monkeypatch):
+    """With no merge owner set, blocking main would block everyone - a rule
+    with no way to satisfy it."""
+    repo = two_workers(notes_repo, merge_owner=None)
+
+    assert not commit_on(repo, "main", monkeypatch).blocked
+
+
+def test_a_branch_of_the_worker_own_making_is_left_alone(notes_repo, monkeypatch):
+    """Only main and other workers' branches are someone else's to commit on.
+    A topic branch is ordinary work."""
+    repo = two_workers(notes_repo, merge_owner="xyz")
+
+    assert not commit_on(repo, "abc-topic", monkeypatch).blocked
+
+
+def test_a_repository_working_alone_is_never_asked_about_branches(notes_repo, monkeypatch):
+    (notes_repo / ".claude" / "girok.json").write_text(
+        json.dumps({"notesDir": "notes", "parallelMode": False, "modules": {"safetyGate": False}}),
+        encoding="utf-8",
+    )
+
+    assert not commit_on(notes_repo, "main", monkeypatch).blocked

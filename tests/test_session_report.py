@@ -186,3 +186,53 @@ def test_a_corrupt_snapshot_does_not_get_a_ready_marker(notes_repo):
 
     assert not report.ready
     assert "[girok] ready" not in report.text
+
+
+def on_branch(monkeypatch, branch, existing=()):
+    import gate_rules
+
+    monkeypatch.setattr(gate_rules, "current_branch", lambda root: branch)
+    monkeypatch.setattr(gate_rules, "branch_exists", lambda root, name, remote: name in existing)
+
+
+def test_a_worker_on_main_is_told_to_switch_to_their_branch(notes_repo, monkeypatch):
+    """Initialization made no branch and nothing mentioned one, so a worker
+    who pulled the repository carried on in main. The rule was in the rule
+    text; the session never brought it up."""
+    method_sync.sync(notes_repo)
+    on_branch(monkeypatch, "main", existing=("abc",))
+
+    report = build(notes_repo, git_email="abc@example.invalid", scan_remote=False)
+
+    assert "[브랜치]" in report.text
+    assert "git switch abc" in report.text
+
+
+def test_a_worker_whose_branch_does_not_exist_is_told_how_to_make_it(notes_repo, monkeypatch):
+    method_sync.sync(notes_repo)
+    on_branch(monkeypatch, "main")
+
+    report = build(notes_repo, git_email="abc@example.invalid", scan_remote=False)
+
+    assert "git switch -c abc" in report.text
+    assert "git push -u" in report.text
+
+
+def test_a_worker_on_their_own_branch_hears_nothing_about_branches(notes_repo, monkeypatch):
+    """A line that appears every session is a line nobody reads by the time
+    it matters."""
+    method_sync.sync(notes_repo)
+    on_branch(monkeypatch, "abc", existing=("abc",))
+
+    report = build(notes_repo, git_email="abc@example.invalid", scan_remote=False)
+
+    assert "[브랜치]" not in report.text
+
+
+def test_a_detached_head_is_not_reported_as_the_wrong_branch(notes_repo, monkeypatch):
+    method_sync.sync(notes_repo)
+    on_branch(monkeypatch, None)
+
+    report = build(notes_repo, git_email="abc@example.invalid", scan_remote=False)
+
+    assert "[브랜치]" not in report.text
