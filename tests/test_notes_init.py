@@ -493,3 +493,13 @@ def test_the_gate_block_is_marked_so_later_versions_can_refresh_it(empty_repo):
     text = (empty_repo / "notes" / "CLAUDE.md").read_text(encoding="utf-8")
     assert method_sync.BOOTSTRAP_BEGIN in text
     assert method_sync.BOOTSTRAP_END in text
+
+
+def test_init_reports_the_registration_it_put_in_the_notes_folder(tmp_path):
+    """Initialization lists what it made so it can be committed. The second
+    settings.json went unlisted, and an uncommitted registration is one that
+    exists on a single machine."""
+    result = notes_init.init(tmp_path, notes_dir="notes", safety_gate=False, parallel_mode=False)
+
+    assert (tmp_path / "notes" / ".claude" / "settings.json").is_file()
+    assert "notes/.claude/settings.json" in result.created

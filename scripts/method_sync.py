@@ -111,8 +111,9 @@ GATE_BLOCK = """\
 >    없으면 **작업을 중단**하고 사용자에게 알린다.
 > 2. Claude Code 라면 세션 시작 주입 블록 `[girok] ready vX.Y.Z` 가 이 세션에
 >    있는가? 없으면 검사가 돌고 있지 않은 것이다 - **작업을 중단**하고 알린다.
->    셋 중 하나다: 폴더 신뢰 미승인, 이 머신에 Python 없음, 스냅샷이 낡아 훅이
->    등록되지 않음(`/notes` 로 sync).
+>    넷 중 하나다: 폴더 신뢰 미승인, 이 머신에 Python 없음, 스냅샷이 낡아 훅이
+>    등록되지 않음(`/notes` 로 sync), 훅 등록이 없는 하위 폴더에서 세션을 시작함
+>    (저장소 루트에서 다시 시작).
 > 3. 다른 에이전트라면 이 파일을 **끝까지 읽은 뒤에만** 작업한다. 아래가 규칙 전문이다.
 >
 > 이 확인을 건너뛰고 편집하면 규칙이 적용되지 않은 채로 기록이 쌓인다 - 그 사실을
@@ -182,6 +183,9 @@ class SyncResult:
     version: Version | None = None
     settings_changed: bool = False
     settings_problem: str | None = None
+    # Session folders below the root, as repository-relative paths.
+    settings_created: list[str] = field(default_factory=list)
+    settings_updated: list[str] = field(default_factory=list)
     gate_refreshed: bool = False
     gate_problem: str | None = None
 
@@ -321,7 +325,42 @@ def hook_settings(prefix: str) -> dict:
     return events
 
 
-def sync_settings(root: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> bool:
+def session_folders(cfg: notes_config.NotesConfig) -> list[Path]:
+    """The folders below the root that also carry the hook registration.
+
+    Claude Code reads `.claude/settings.json` from the folder a session was
+    started in and from nowhere above it -- unlike CLAUDE.md, which it reads
+    all the way up. So a session opened in the notes folder saw the gate and
+    ran no hook: the repository was fully set up and work stopped anyway.
+
+    Every folder on the way from the root down to the notes gets the same
+    registration. The command finds the wrapper through git at run time, so
+    the entry is identical wherever it sits. Other subfolders are not
+    covered; the gate still stops a session started there.
+    """
+    try:
+        rel = cfg.notes_dir.relative_to(cfg.repo_root)
+    except ValueError:
+        return []
+    folders = []
+    current = cfg.repo_root
+    for part in rel.parts:
+        current = current / part
+        folders.append(current)
+    return folders
+
+
+def _settings_label(folder: Path, repo_root: Path) -> str:
+    rel = folder.relative_to(repo_root).as_posix()
+    return ".claude/settings.json" if rel == "." else f"{rel}/.claude/settings.json"
+
+
+def sync_settings(
+    root: Path,
+    prefix: str,
+    plugin_root: Path = PLUGIN_ROOT,
+    label: str = ".claude/settings.json",
+) -> bool:
     """Put the snapshot's hooks into the repository's own settings.
 
     Every repository that adopted girok before this already has a
@@ -339,7 +378,7 @@ def sync_settings(root: Path, prefix: str, plugin_root: Path = PLUGIN_ROOT) -> b
             # Overwriting half-edited JSON would take someone's work with it,
             # so this stops -- but loudly. The caller records the problem.
             raise SettingsUnreadable(
-                f".claude/settings.json 을 읽을 수 없어 훅을 등록하지 못했다 ({exc}). "
+                f"{label} 을 읽을 수 없어 훅을 등록하지 못했다 ({exc}). "
                 f"그 파일을 고친 뒤 다시 sync 할 것 - 지금은 규칙이 저장소에 있어도 "
                 f"아무것도 검사하지 않는다"
             ) from exc
@@ -488,18 +527,27 @@ def _registration_problems(cfg: notes_config.NotesConfig) -> list[str]:
     is free to register hooks of its own, and failing it for that would push
     people to drop the check instead of the hook.
     """
-    path = cfg.repo_root / ".claude" / "settings.json"
+    wrapper = f"{notes_prefix(cfg)}.method/hooks/run-hook.cmd"
+    problems = []
+    for folder in [cfg.repo_root, *session_folders(cfg)]:
+        problems.extend(
+            _registration_problems_at(folder, _settings_label(folder, cfg.repo_root), wrapper)
+        )
+    return problems
+
+
+def _registration_problems_at(folder: Path, label: str, wrapper: str) -> list[str]:
+    path = folder / ".claude" / "settings.json"
     if not path.is_file():
         return [
-            ".claude/settings.json 없음 - 훅이 등록되지 않았다. "
-            "규칙이 저장소에 있어도 아무것도 검사하지 않는다. `/notes` 로 sync 할 것"
+            f"{label} 없음 - 훅이 등록되지 않았다. "
+            f"규칙이 저장소에 있어도 아무것도 검사하지 않는다. `/notes` 로 sync 할 것"
         ]
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        return [f".claude/settings.json 을 읽을 수 없다 ({exc})"]
+        return [f"{label} 을 읽을 수 없다 ({exc})"]
 
-    wrapper = f"{notes_prefix(cfg)}.method/hooks/run-hook.cmd"
     registered = data.get("hooks") or {}
     missing = []
     for event, script, _matcher, _timeout in HOOK_EVENTS:
@@ -512,7 +560,7 @@ def _registration_problems(cfg: notes_config.NotesConfig) -> list[str]:
             missing.append(event)
     if missing:
         return [
-            f".claude/settings.json 에 훅이 등록되지 않았다 ({', '.join(missing)}) - "
+            f"{label} 에 훅이 등록되지 않았다 ({', '.join(missing)}) - "
             f"등록이 없으면 규칙이 저장소에 있어도 아무것도 검사하지 않는다. "
             f"`/notes` 로 sync 할 것"
         ]
@@ -704,6 +752,16 @@ def sync(start: Path | str = ".", plugin_root: Path = PLUGIN_ROOT) -> SyncResult
         result.settings_changed = sync_settings(cfg.repo_root, notes_prefix(cfg), plugin_root)
     except SettingsUnreadable as exc:
         result.settings_problem = str(exc)
+    for folder in session_folders(cfg):
+        label = _settings_label(folder, cfg.repo_root)
+        existed = (folder / ".claude" / "settings.json").is_file()
+        try:
+            changed = sync_settings(folder, notes_prefix(cfg), plugin_root, label)
+        except SettingsUnreadable as exc:
+            result.settings_problem = "\n".join(filter(None, [result.settings_problem, str(exc)]))
+            continue
+        if changed:
+            (result.settings_updated if existed else result.settings_created).append(label)
     return result
 
 
@@ -822,8 +880,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[확인] {result.gate_problem}")
         if result.settings_problem:
             print(f"[실패] {result.settings_problem}")
-        elif result.settings_changed:
+        if result.settings_changed:
             print("[등록] .claude/settings.json 에 훅 5종 - 커밋해야 다른 머신에도 걸린다")
+        for label in result.settings_created + result.settings_updated:
+            print(f"[등록] {label} 에 훅 5종 - 이 폴더에서 시작한 세션에도 걸린다. 커밋할 것")
         print(f"[완료] {len(result.written)}개 파일, {result.version.render().strip()}")
         return 0
 

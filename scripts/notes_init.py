@@ -241,6 +241,8 @@ def init(
         result.updated.append(rel)
     else:
         result.created.append(rel)
+    result.created.extend(sync_result.settings_created)
+    result.updated.extend(sync_result.settings_updated)
     return result
 
 

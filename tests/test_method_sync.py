@@ -688,3 +688,125 @@ def test_a_pointer_kept_in_crlf_stays_in_crlf(notes_repo):
         raw = handle.read()
     assert "\r\n" in raw
     assert "\n" not in raw.replace("\r\n", "")
+
+
+def nested_repo(tmp_path):
+    """A repository whose notes sit two folders down: <root>/app/notes."""
+    root = tmp_path / "repo"
+    write(root / ".claude" / "girok.json", json.dumps({"notesDir": "app/notes"}))
+    write(root / "app" / "notes" / "docs" / "PROGRESS.md", "# 현황판\n")
+    return root
+
+
+def our_commands(settings_file):
+    data = json.loads(settings_file.read_text(encoding="utf-8"))
+    return [
+        hook.get("command", "")
+        for entries in data.get("hooks", {}).values()
+        for entry in entries
+        for hook in entry.get("hooks", [])
+    ]
+
+
+def test_a_session_started_in_the_notes_folder_still_gets_the_hooks(notes_repo):
+    """Claude Code reads `.claude/settings.json` from the folder the session
+    was started in and nowhere above it. Opened one level down - in the notes
+    folder, where the gate itself lives - a repository that was fully set up
+    ran no hook at all, and the gate stopped work with nothing to fix."""
+    result = method_sync.sync(notes_repo)
+
+    settings = notes_repo / "notes" / ".claude" / "settings.json"
+    assert settings.is_file()
+    commands = our_commands(settings)
+    assert len(commands) == len(method_sync.HOOK_EVENTS)
+    assert all("/notes/.method/hooks/run-hook.cmd" in c for c in commands)
+    assert result.settings_created == ["notes/.claude/settings.json"]
+
+
+def test_every_folder_between_the_root_and_the_notes_is_registered(tmp_path):
+    """With the notes two folders down there are two places to start a session
+    that are not the root, and each one reads only its own settings."""
+    root = nested_repo(tmp_path)
+
+    method_sync.sync(root)
+
+    for folder in ("app", "app/notes"):
+        commands = our_commands(root / folder / ".claude" / "settings.json")
+        assert all("/app/notes/.method/hooks/run-hook.cmd" in c for c in commands), folder
+        assert len(commands) == len(method_sync.HOOK_EVENTS)
+    assert method_sync.verify(root).ok
+
+
+def test_a_flat_repository_gets_no_second_registration(tmp_path):
+    """notesDir "." has no folder between the root and the notes, so there is
+    nothing to add - and a stray `.claude/` somewhere would be a file nobody
+    asked for."""
+    root = tmp_path / "repo"
+    write(root / ".claude" / "girok.json", json.dumps({"notesDir": "."}))
+
+    result = method_sync.sync(root)
+
+    found = sorted(p.relative_to(root).as_posix() for p in root.rglob("settings.json"))
+    assert found == [".claude/settings.json"]
+    assert result.settings_created == []
+
+
+def test_verify_fails_when_a_session_folder_lost_its_registration(notes_repo):
+    """The root registration alone reads as fully set up. A session opened in
+    the notes folder would run unsupervised, and only the gate would notice -
+    after the fact, on that one machine."""
+    method_sync.sync(notes_repo)
+    (notes_repo / "notes" / ".claude" / "settings.json").unlink()
+
+    result = method_sync.verify(notes_repo)
+
+    assert not result.ok
+    assert any("notes/.claude/settings.json" in problem for problem in result.problems)
+
+
+def test_a_second_sync_reports_no_session_folder_change(notes_repo):
+    method_sync.sync(notes_repo)
+
+    result = method_sync.sync(notes_repo)
+
+    assert result.settings_created == []
+    assert result.settings_updated == []
+
+
+def test_a_session_folder_keeps_the_settings_it_already_had(notes_repo):
+    """Somebody who opens sessions in the notes folder may have put
+    permissions there. Registering the hooks must not cost them."""
+    existing = notes_repo / "notes" / ".claude" / "settings.json"
+    write(existing, json.dumps({"permissions": {"allow": ["Bash(ls:*)"]}}))
+
+    result = method_sync.sync(notes_repo)
+
+    data = json.loads(existing.read_text(encoding="utf-8"))
+    assert data["permissions"]["allow"] == ["Bash(ls:*)"]
+    assert "SessionStart" in data["hooks"]
+    assert result.settings_updated == ["notes/.claude/settings.json"]
+
+
+def test_a_broken_session_folder_settings_file_is_named(notes_repo):
+    """The root file registering cleanly must not hide a subfolder file that
+    could not be written - that folder is exactly where the hooks are absent."""
+    write(notes_repo / "notes" / ".claude" / "settings.json", "{ 이건 JSON 이 아니다")
+
+    result = method_sync.sync(notes_repo)
+
+    assert result.settings_problem
+    assert "notes/.claude/settings.json" in result.settings_problem
+
+
+def test_the_gate_names_starting_in_an_unregistered_folder(notes_repo):
+    """The gate listed three causes for a missing ready block and the fourth
+    was the one that happened: a session started below the root in a folder
+    with no registration. Every listed cause was checked and none applied."""
+    method_sync.sync(notes_repo)
+
+    head = (notes_repo / "notes" / ".method" / "RULES.md").read_text(encoding="utf-8")[:1800]
+    pointer = method_sync.bootstrap_block(method_sync.PLUGIN_ROOT, "notes/")
+
+    for text in (head, pointer):
+        assert "하위 폴더" in text
+        assert "셋 중 하나" not in text
